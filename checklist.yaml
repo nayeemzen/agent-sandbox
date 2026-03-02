@@ -99,8 +99,8 @@ tasks:
 
   - id: TASK-009
     description: Phase 5 - Setup (sandbox setup local/remote flows, idempotent, safe, calls init).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "b35d393a829dae3752a583cebf67dc1ccf4eb4bb"
     failure_reason: ""
     acceptance_criteria:
       - sandbox setup can guide a new machine to a ready state (or do it when safe).
