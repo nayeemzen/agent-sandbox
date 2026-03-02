@@ -24,7 +24,7 @@ func NewRootCmd() *cobra.Command {
 
 	cmd.AddCommand(
 		newNotImplementedCmd("setup", "Set up the local environment for running sandboxes"),
-		newNotImplementedCmd("doctor", "Run diagnostics to check whether the environment is ready"),
+		newDoctorCmd(),
 		newNotImplementedCmd("init", "Ensure a usable default template exists"),
 		newTemplateCmd(),
 		newNewCmd(),
