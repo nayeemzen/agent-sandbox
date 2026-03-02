@@ -7,3 +7,5 @@
 - 2026-03-02 02:31 evidence: Captured DHCPDISCOVER packets on `incusbr0` but no DHCP OFFER/ACK responses were observed.
 - 2026-03-02 02:31 fix: Allowed DHCP server traffic on the Incus bridge by adding a UFW rule permitting inbound UDP/67 on `incusbr0`.
 - 2026-03-02 02:31 note: Go toolchain auto-upgraded to Go 1.25.x to use the Incus Go client module `github.com/lxc/incus/v6` (v6.22.0 requires Go >= 1.25).
+- 2026-03-02 02:55 decision: Implement templates as Incus images published from a seed instance snapshot, with a stable alias prefix `sandbox/`.
+- 2026-03-02 02:55 note: Added `--config` and `--state` flags so development and integration tests can run without mutating a user’s real local state.

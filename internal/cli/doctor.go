@@ -11,10 +11,7 @@ import (
 	"github.com/nayeemzen/agent-sandbox/internal/incus"
 )
 
-func newDoctorCmd() *cobra.Command {
-	var remoteURL string
-	var unixSocket string
-	var insecure bool
+func newDoctorCmd(opts *GlobalOptions) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:           "doctor",
@@ -28,9 +25,9 @@ func newDoctorCmd() *cobra.Command {
 			}
 
 			s, err := incus.Connect(ctx, incus.ConnectOptions{
-				UnixSocket:         unixSocket,
-				RemoteURL:          remoteURL,
-				InsecureSkipVerify: insecure,
+				UnixSocket:         opts.IncusUnixSocket,
+				RemoteURL:          opts.IncusRemoteURL,
+				InsecureSkipVerify: opts.IncusInsecure,
 			})
 			if err != nil {
 				res := []doctor.CheckResult{
@@ -48,7 +45,7 @@ func newDoctorCmd() *cobra.Command {
 			}
 
 			results := incus.RunDoctor(ctx, s, incus.DoctorOptions{
-				LocalMode: remoteURL == "",
+				LocalMode: opts.IncusRemoteURL == "",
 			})
 
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(results))
@@ -59,10 +56,6 @@ func newDoctorCmd() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&remoteURL, "remote-url", "", "Remote Incus HTTPS URL (for example https://host:8443)")
-	cmd.Flags().StringVar(&unixSocket, "unix-socket", "/var/lib/incus/unix.socket", "Local Incus unix socket path")
-	cmd.Flags().BoolVar(&insecure, "insecure", false, "Skip TLS verification for --remote-url (debug only)")
 
 	return cmd
 }

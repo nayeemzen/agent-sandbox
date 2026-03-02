@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newMonitorCmd(defaultInterval time.Duration) *cobra.Command {
+func newMonitorCmd(_ *GlobalOptions, defaultInterval time.Duration) *cobra.Command {
 	var interval time.Duration
 
 	cmd := newNotImplementedCmd("monitor", "Show live per-sandbox resource usage relative to host capacity")

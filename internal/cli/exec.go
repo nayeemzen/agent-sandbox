@@ -2,7 +2,7 @@ package cli
 
 import "github.com/spf13/cobra"
 
-func newExecCmd() *cobra.Command {
+func newExecCmd(_ *GlobalOptions) *cobra.Command {
 	var detach bool
 	var procName string
 

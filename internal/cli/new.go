@@ -2,7 +2,7 @@ package cli
 
 import "github.com/spf13/cobra"
 
-func newNewCmd() *cobra.Command {
+func newNewCmd(_ *GlobalOptions) *cobra.Command {
 	var template string
 
 	cmd := newNotImplementedCmd("new <name>", "Create a sandbox quickly from an existing template (fast path)")
