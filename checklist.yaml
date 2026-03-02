@@ -111,8 +111,8 @@ tasks:
 
   - id: TASK-010
     description: Phase 6 - Monitor (sandbox monitor polls Incus metrics and shows per-sandbox + host ratios).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "cbec3320ca3ba5ce8d0d20480040da562c9585f6"
     failure_reason: ""
     acceptance_criteria:
       - sandbox monitor polls at a configurable interval (default 15s) and refreshes display.
