@@ -32,14 +32,25 @@ type ManagedProc struct {
 type State struct {
 	Version int `json:"version"`
 
+	// Sandboxes are keyed by sandbox name.
+	Sandboxes map[string]Sandbox `json:"sandboxes"`
+
 	// Procs are keyed by sandbox name, then proc name.
 	Procs map[string]map[string]ManagedProc `json:"procs"`
 }
 
+type Sandbox struct {
+	Name      string    `json:"name"`
+	Template  string    `json:"template"`
+	CreatedAt time.Time `json:"created_at"`
+	LastState string    `json:"last_state"`
+}
+
 func Default() State {
 	return State{
-		Version: currentVersion,
-		Procs:   map[string]map[string]ManagedProc{},
+		Version:   currentVersion,
+		Sandboxes: map[string]Sandbox{},
+		Procs:     map[string]map[string]ManagedProc{},
 	}
 }
 
@@ -62,6 +73,10 @@ func Load(path string) (State, error) {
 		st.Version = currentVersion
 	}
 
+	if st.Sandboxes == nil {
+		st.Sandboxes = map[string]Sandbox{}
+	}
+
 	if st.Procs == nil {
 		st.Procs = map[string]map[string]ManagedProc{}
 	}
@@ -72,6 +87,9 @@ func Load(path string) (State, error) {
 func Save(path string, st State) error {
 	if st.Version == 0 {
 		st.Version = currentVersion
+	}
+	if st.Sandboxes == nil {
+		st.Sandboxes = map[string]Sandbox{}
 	}
 	if st.Procs == nil {
 		st.Procs = map[string]map[string]ManagedProc{}

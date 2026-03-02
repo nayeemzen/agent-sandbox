@@ -9,3 +9,6 @@
 - 2026-03-02 02:31 note: Go toolchain auto-upgraded to Go 1.25.x to use the Incus Go client module `github.com/lxc/incus/v6` (v6.22.0 requires Go >= 1.25).
 - 2026-03-02 02:55 decision: Implement templates as Incus images published from a seed instance snapshot, with a stable alias prefix `sandbox/`.
 - 2026-03-02 02:55 note: Added `--config` and `--state` flags so development and integration tests can run without mutating a user’s real local state.
+- 2026-03-02 03:12 decision: Use `golang.org/x/term` for TTY detection; emojis and ANSI styling are emitted only when stdout is a TTY.
+- 2026-03-02 03:12 decision: Sandbox lifecycle commands only operate on Incus instances labeled `user.sandbox.managed=true` to avoid accidental operations on unrelated instances.
+- 2026-03-02 03:12 evidence: Smoke-tested `sandbox template add`, `sandbox new`, `sandbox ls`, `pause`, `start`, `stop`, and `delete` against a local Incus daemon (via `sg incus-admin -c ...`).
