@@ -1,0 +1,13 @@
+# Minimal subset of Incus metrics used by sandbox monitor unit tests.
+
+incus_cpu_seconds_total{cpu="0",mode="system",name="sb1",project="default",type="container"} 1
+incus_cpu_seconds_total{cpu="0",mode="user",name="sb1",project="default",type="container"} 2
+incus_cpu_seconds_total{cpu="0",mode="system",name="sb2",project="default",type="container"} 0.5
+
+incus_memory_Active_bytes{name="sb1",project="default",type="container"} 100
+incus_memory_Inactive_bytes{name="sb1",project="default",type="container"} 200
+
+incus_network_receive_bytes_total{device="lo",name="sb1",project="default",type="container"} 999
+incus_network_receive_bytes_total{device="eth0",name="sb1",project="default",type="container"} 1000
+incus_network_transmit_bytes_total{device="eth0",name="sb1",project="default",type="container"} 2000
+
