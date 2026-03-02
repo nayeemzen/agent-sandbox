@@ -123,8 +123,8 @@ tasks:
 
   - id: TASK-011
     description: Automated unit tests baseline (core packages: config/state, template resolution, duration/TTY formatting, and error normalization).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "a291dbf93e7ff09fc28c97a2f4767a78412935d7"
     failure_reason: ""
     acceptance_criteria:
       - go test ./... runs successfully and is fast enough for CI use.
