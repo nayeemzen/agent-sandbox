@@ -36,8 +36,8 @@ tasks:
 
   - id: TASK-004
     description: Phase 0 - Project skeleton (Go module, CLI framework, command surface, output conventions).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "1006cfbb3efe20997363eaeb43b81b92fd01607a"
     failure_reason: ""
     acceptance_criteria:
       - sandbox builds and runs locally.
