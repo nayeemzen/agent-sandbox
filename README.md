@@ -57,9 +57,9 @@ Template (immutable image)          Sandbox (mutable container)
 ## Requirements
 
 - **Linux host** (bare metal or VM with nested container support)
-- **Incus** installed and initialized (`incusd` running)
-- **Permission** to talk to Incus (membership in the `incus-admin` group)
 - **Go >= 1.25** (build from source)
+
+`sandbox install` takes care of the rest (Incus, daemon init, group membership, default template).
 
 ## Install
 
