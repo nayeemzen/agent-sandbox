@@ -1,0 +1,155 @@
+tasks:
+  - id: TASK-001
+    description: Write an Incus-first PLAN.md for the agent-sandbox repo and sandbox CLI, defining concepts (template/sandbox/process) and mapping each CLI command to Incus primitives/operations.
+    status: complete
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - PLAN.md exists and is readable by an engineer with no prior context.
+      - PLAN.md defines what a "template" is and how it maps to Incus (image alias published from a seed snapshot).
+      - PLAN.md breaks down each CLI command's intended behavior.
+      - PLAN.md includes explicit Incus mapping details (images/instances/snapshots/network/storage/metrics) and CLI-equivalent operations.
+    implementation_notes: Updated / rewrote PLAN.md to be Incus-first and added command-by-command Incus mappings.
+
+  - id: TASK-002
+    description: Initialize git locally and create the GitHub repo named agent-sandbox; configure origin and verify non-interactive pushes.
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - This directory is a git repo with a clean default branch (main).
+      - GitHub repo agent-sandbox exists and origin points to it (SSH preferred).
+      - git push works non-interactively (no username/password prompts).
+    implementation_notes: Use GitHub CLI (gh) to create the repo and set up origin.
+
+  - id: TASK-003
+    description: Set up Incus locally (dev preflight) and confirm it works end-to-end for container instances.
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - Incus daemon is installed and running locally.
+      - The current user can use Incus without sudo (socket permissions or group membership are correct).
+      - A trivial container can be created, started, exec'd into, and deleted without prompts.
+      - Instances receive an IP on an Incus-managed bridge network.
+    implementation_notes: This is a prerequisite for running local integration tests during development.
+
+  - id: TASK-004
+    description: Phase 0 - Project skeleton (Go module, CLI framework, command surface, output conventions).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - sandbox builds and runs locally.
+      - sandbox --help lists all planned v1 commands with correct flag stubs.
+      - Human output format conventions are consistent across commands (even if behavior is stubbed).
+      - go test ./... runs successfully.
+    implementation_notes: Keep code paths backend-agnostic at the CLI boundary, but do not over-abstract away Incus in v1.
+
+  - id: TASK-005
+    description: Phase 1 - Incus connectivity and sandbox doctor (local + remote, auth, readiness checks).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - sandbox doctor reports pass/warn/fail checks and exits non-zero on fail.
+      - Supports connecting to a local Incus daemon and a remote Incus daemon.
+      - Detects missing prerequisites relevant to templates (storage/network/metrics/OCI tooling).
+      - Unit tests cover doctor check evaluation and output formatting for pass/warn/fail.
+    implementation_notes: Prefer Incus REST API via the official Go client; avoid requiring the incus CLI.
+
+  - id: TASK-006
+    description: Phase 2 - Templates (template add/ls/rm/default + init; OCI source end-to-end seed->provision->publish).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - sandbox template add creates an Incus image alias sandbox/<template>.
+      - sandbox template ls shows templates and indicates default.
+      - sandbox template rm removes the template artifact with correct safety behavior.
+      - sandbox init creates and/or selects a default template idempotently.
+      - Unit tests cover template resolution rules and default selection logic.
+    implementation_notes: Enforce the v1 provisioning contract for all templates; document and version the default template provisioning.
+
+  - id: TASK-007
+    description: Phase 3 - Sandboxes (new/ls/pause/resume/stop/start/delete + template resolution + timing output).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - sandbox new creates an instance from an existing template and is shell-ready quickly.
+      - sandbox new prints creation duration with ⚡️/😐/😬 indicator rules (TTY-only styling).
+      - sandbox ls shows name/state/age/IP(s)/template for CLI-managed instances.
+      - Lifecycle commands work predictably and update local state.
+      - Unit tests cover duration classification (<3s, 3-10s, >10s) and JSON vs TTY formatting behavior.
+    implementation_notes: Ensure /var/log/sandbox exists in guests created by sandbox new.
+
+  - id: TASK-008
+    description: Phase 4 - Exec + managed processes + logs (exec foreground, exec --detach, logs, ps, kill).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - sandbox exec streams stdout/stderr and returns the guest command exit code.
+      - sandbox exec --detach creates a managed proc with log file in /var/log/sandbox/<proc>.log.
+      - sandbox logs tails managed proc logs until interrupted.
+      - sandbox ps and sandbox kill work for CLI-managed processes.
+      - Unit tests cover managed-proc metadata storage and proc selection rules for sandbox logs.
+    implementation_notes: Use a pidfile + log redirection pattern; do not require systemd/journald inside the sandbox.
+
+  - id: TASK-009
+    description: Phase 5 - Setup (sandbox setup local/remote flows, idempotent, safe, calls init).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - sandbox setup can guide a new machine to a ready state (or do it when safe).
+      - Does not silently perform destructive actions.
+      - Leaves the user with a usable default template or clear instructions.
+      - Unit tests cover setup decision logic (local vs remote) in a side-effect-free way.
+    implementation_notes: sandbox does not bundle incusd; local Incus is the primary supported onboarding path in v1.
+
+  - id: TASK-010
+    description: Phase 6 - Monitor (sandbox monitor polls Incus metrics and shows per-sandbox + host ratios).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - sandbox monitor polls at a configurable interval (default 15s) and refreshes display.
+      - Shows per-sandbox CPU/mem/net plus totals and ratios vs host.
+      - Degrades gracefully if metrics are unavailable (clear warnings).
+      - Unit tests cover parsing and aggregation of Incus Prometheus metrics samples (with golden fixtures).
+    implementation_notes: Start with polling; consider Incus events stream as a future enhancement.
+
+  - id: TASK-011
+    description: Automated unit tests baseline (core packages: config/state, template resolution, duration/TTY formatting, and error normalization).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - go test ./... runs successfully and is fast enough for CI use.
+      - Unit tests exist for core pure-logic components (no Incus required).
+      - Test fixtures cover edge cases (missing default template, multiple templates, duration thresholds, JSON output invariants).
+    implementation_notes: Keep Incus behind interfaces so unit tests stay hermetic.
+
+  - id: TASK-012
+    description: Automated integration tests + CI (Incus backend end-to-end: template->new->exec/logs lifecycle).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - Integration tests can run non-interactively and clean up after themselves.
+      - Integration tests cover template add, new, exec, exec --detach, and logs behavior.
+      - CI runs unit tests on every push; integration tests run automatically in at least one supported CI environment (or on a documented self-hosted runner setup).
+    implementation_notes: Gate integration tests behind an env var/build tag, but ensure they are executed in CI somewhere so they do not rot.
+
+  - id: TASK-013
+    description: Phase 7 - Polish (json output, error consistency, completions).
+    status: not_started
+    git_commit_sha: ""
+    failure_reason: ""
+    acceptance_criteria:
+      - Key commands support --json with stable fields.
+      - Error messages are actionable and consistent (avoid Incus jargon where possible).
+      - Shell completions are available (or explicitly deferred with rationale).
+    implementation_notes: Keep polish changes small and test-driven where possible.
