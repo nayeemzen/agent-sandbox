@@ -15,3 +15,5 @@
 - 2026-03-02 03:24 decision: Managed processes are implemented via `sh -lc` + backgrounding, writing pidfiles under `/run/sandbox` and stdout/stderr logs under `/var/log/sandbox`.
 - 2026-03-02 03:24 fix: Updated the Incus exec helper to avoid hanging on long-running commands by respecting context cancellation and cancelling the underlying Incus operation.
 - 2026-03-02 03:24 evidence: Smoke-tested `sandbox exec` exit code propagation, `exec --detach`, `ps`, `logs` (tail), and `kill` against a local Incus daemon.
+- 2026-03-02 03:27 decision: `sandbox setup` is a safe orchestrator: runs doctor, prints remediation, and optionally runs `sandbox init`; it does not attempt to install/configure `incusd` itself in v1.
+- 2026-03-02 03:27 evidence: Smoke-tested `sandbox setup --no-init` on a local Incus daemon.
