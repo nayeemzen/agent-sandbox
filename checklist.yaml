@@ -60,8 +60,8 @@ tasks:
 
   - id: TASK-006
     description: Phase 2 - Templates (template add/ls/rm/default + init; OCI source end-to-end seed->provision->publish).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "ff908a39fd19438527ad97a2c690ff7890529692"
     failure_reason: ""
     acceptance_criteria:
       - sandbox template add creates an Incus image alias sandbox/<template>.
