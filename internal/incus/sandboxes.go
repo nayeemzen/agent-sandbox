@@ -53,8 +53,8 @@ func CreateSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 		return Sandbox{}, err
 	}
 
-	// Ensure log directory exists. This is part of the v1 contract.
-	if err := execInInstance(ctx, s, name, []string{"sh", "-lc", "mkdir -p /var/log/sandbox && chmod 0755 /var/log/sandbox"}); err != nil {
+	// Ensure Sandbox-owned directories exist. This is part of the v1 contract.
+	if err := execInInstance(ctx, s, name, []string{"sh", "-lc", "mkdir -p /var/log/sandbox /run/sandbox && chmod 0755 /var/log/sandbox /run/sandbox"}); err != nil {
 		return Sandbox{}, err
 	}
 

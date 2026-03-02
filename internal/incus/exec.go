@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	incusclient "github.com/lxc/incus/v6/client"
 	"github.com/lxc/incus/v6/shared/api"
@@ -42,9 +43,26 @@ func Exec(ctx context.Context, s incusclient.InstanceServer, instance string, co
 		return ExecResult{}, err
 	}
 
-	<-dataDone
-	if err := op.WaitContext(ctx); err != nil {
-		return ExecResult{}, err
+	waitErr := op.WaitContext(ctx)
+	if waitErr != nil {
+		// If the caller cancelled, attempt to cancel the operation so the websocket
+		// closes and we don't block waiting for DataDone.
+		if ctx.Err() != nil {
+			_ = op.Cancel()
+		}
+
+		select {
+		case <-dataDone:
+		case <-time.After(2 * time.Second):
+		}
+
+		return ExecResult{}, waitErr
+	}
+
+	// Ensure output is fully drained.
+	select {
+	case <-dataDone:
+	case <-time.After(2 * time.Second):
 	}
 
 	codeAny, ok := op.Get().Metadata["return"]

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/nayeemzen/agent-sandbox/internal/cli"
@@ -8,6 +9,10 @@ import (
 
 func main() {
 	if err := cli.NewRootCmd().Execute(); err != nil {
+		var ec cli.ExitCodeError
+		if errors.As(err, &ec) {
+			os.Exit(ec.Code)
+		}
 		os.Exit(1)
 	}
 }
