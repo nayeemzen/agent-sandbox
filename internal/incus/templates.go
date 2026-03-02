@@ -61,7 +61,7 @@ func TemplateExists(s incusclient.InstanceServer, name string) (bool, error) {
 	}
 
 	// Incus client doesn't expose a typed "not found" error; best-effort.
-	if strings.Contains(err.Error(), "not found") {
+	if IsNotFound(err) {
 		return false, nil
 	}
 
@@ -191,13 +191,13 @@ func DeleteTemplate(ctx context.Context, s incusclient.InstanceServer, name stri
 	entry, _, err := s.GetImageAlias(alias)
 	if err != nil {
 		// Treat not-found as success.
-		if strings.Contains(err.Error(), "not found") {
+		if IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
 
-	if err := s.DeleteImageAlias(alias); err != nil && !strings.Contains(err.Error(), "not found") {
+	if err := s.DeleteImageAlias(alias); err != nil && !IsNotFound(err) {
 		return err
 	}
 

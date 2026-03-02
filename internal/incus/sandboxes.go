@@ -156,7 +156,7 @@ func DeleteSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 	op, err := s.DeleteInstance(name)
 	if err != nil {
 		// Treat not-found as success.
-		if strings.Contains(err.Error(), "not found") {
+		if IsNotFound(err) {
 			return nil
 		}
 		return err
