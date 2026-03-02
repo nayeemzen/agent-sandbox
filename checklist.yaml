@@ -86,8 +86,8 @@ tasks:
 
   - id: TASK-008
     description: Phase 4 - Exec + managed processes + logs (exec foreground, exec --detach, logs, ps, kill).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "63024a1410f0d581e176bd8c10d26faea1039a63"
     failure_reason: ""
     acceptance_criteria:
       - sandbox exec streams stdout/stderr and returns the guest command exit code.
@@ -95,7 +95,7 @@ tasks:
       - sandbox logs tails managed proc logs until interrupted.
       - sandbox ps and sandbox kill work for CLI-managed processes.
       - Unit tests cover managed-proc metadata storage and proc selection rules for sandbox logs.
-    implementation_notes: Use a pidfile + log redirection pattern; do not require systemd/journald inside the sandbox.
+    implementation_notes: Implemented foreground exec with exit-code propagation; implemented detached procs via pidfiles under /run/sandbox and logs under /var/log/sandbox; added unit tests for proc selection + state storage.
 
   - id: TASK-009
     description: Phase 5 - Setup (sandbox setup local/remote flows, idempotent, safe, calls init).
