@@ -57,6 +57,21 @@ func newTemplateAddCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			if opts.JSON {
+				var uploadedAt *time.Time
+				if !tpl.UploadedAt.IsZero() {
+					uploadedAt = &tpl.UploadedAt
+				}
+				return writeJSON(cmd.OutOrStdout(), templateInfoJSON{
+					Name:        tpl.Name,
+					Alias:       tpl.Alias,
+					Fingerprint: tpl.Fingerprint,
+					Source:      tpl.Source,
+					UploadedAt:  uploadedAt,
+					Default:     false,
+				})
+			}
+
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "template %s created (alias=%s fingerprint=%s)\n", tpl.Name, tpl.Alias, shortFingerprint(tpl.Fingerprint))
 			return nil
 		},
@@ -97,6 +112,25 @@ func newTemplateLsCmd(opts *GlobalOptions) *cobra.Command {
 
 			sort.Slice(templates, func(i, j int) bool { return templates[i].Name < templates[j].Name })
 
+			if opts.JSON {
+				out := make([]templateInfoJSON, 0, len(templates))
+				for _, t := range templates {
+					var uploadedAt *time.Time
+					if !t.UploadedAt.IsZero() {
+						uploadedAt = &t.UploadedAt
+					}
+					out = append(out, templateInfoJSON{
+						Name:        t.Name,
+						Alias:       t.Alias,
+						Fingerprint: t.Fingerprint,
+						Source:      t.Source,
+						UploadedAt:  uploadedAt,
+						Default:     cfg.DefaultTemplate == t.Name,
+					})
+				}
+				return writeJSON(cmd.OutOrStdout(), out)
+			}
+
 			if len(templates) == 0 {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "(no templates)")
 				return nil
@@ -129,6 +163,15 @@ func newTemplateLsCmd(opts *GlobalOptions) *cobra.Command {
 	}
 
 	return cmd
+}
+
+type templateInfoJSON struct {
+	Name        string     `json:"name"`
+	Alias       string     `json:"alias"`
+	Fingerprint string     `json:"fingerprint"`
+	Source      string     `json:"source,omitempty"`
+	UploadedAt  *time.Time `json:"uploaded_at,omitempty"`
+	Default     bool       `json:"default"`
 }
 
 func newTemplateRmCmd(opts *GlobalOptions) *cobra.Command {

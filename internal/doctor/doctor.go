@@ -14,11 +14,11 @@ const (
 )
 
 type CheckResult struct {
-	ID          string
-	Status      Status
-	Summary     string
-	Details     string
-	Remediation string
+	ID          string `json:"id"`
+	Status      Status `json:"status"`
+	Summary     string `json:"summary"`
+	Details     string `json:"details,omitempty"`
+	Remediation string `json:"remediation,omitempty"`
 }
 
 func ExitCode(results []CheckResult) int {

@@ -1,8 +1,15 @@
 package templates
 
 import (
+	"errors"
 	"fmt"
 	"slices"
+)
+
+var (
+	ErrNoTemplates       = errors.New("no templates available")
+	ErrMultipleTemplates = errors.New("multiple templates available")
+	ErrTemplateNotFound  = errors.New("template not found")
 )
 
 type ResolveInput struct {
@@ -14,7 +21,7 @@ type ResolveInput struct {
 func Resolve(in ResolveInput) (string, error) {
 	if in.Explicit != "" {
 		if !slices.Contains(in.Names, in.Explicit) {
-			return "", fmt.Errorf("template %q not found", in.Explicit)
+			return "", fmt.Errorf("%w: %q", ErrTemplateNotFound, in.Explicit)
 		}
 		return in.Explicit, nil
 	}
@@ -28,8 +35,8 @@ func Resolve(in ResolveInput) (string, error) {
 	}
 
 	if len(in.Names) == 0 {
-		return "", fmt.Errorf("no templates available")
+		return "", ErrNoTemplates
 	}
 
-	return "", fmt.Errorf("multiple templates available; set a default or specify --template")
+	return "", ErrMultipleTemplates
 }

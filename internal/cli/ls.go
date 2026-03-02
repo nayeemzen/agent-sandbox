@@ -40,7 +40,18 @@ func newLsCmd(opts *GlobalOptions) *cobra.Command {
 			sort.Slice(sandboxes, func(i, j int) bool { return sandboxes[i].Name < sandboxes[j].Name })
 
 			if opts.JSON {
-				return writeJSON(cmd.OutOrStdout(), sandboxes)
+				out := make([]sandboxInfoJSON, 0, len(sandboxes))
+				for _, sb := range sandboxes {
+					out = append(out, sandboxInfoJSON{
+						Name:      sb.Name,
+						Template:  sb.Template,
+						Status:    sb.Status,
+						CreatedAt: sb.CreatedAt,
+						IPv4:      sb.IPv4,
+						IPv6:      sb.IPv6,
+					})
+				}
+				return writeJSON(cmd.OutOrStdout(), out)
 			}
 
 			if len(sandboxes) == 0 {
@@ -77,4 +88,13 @@ func newLsCmd(opts *GlobalOptions) *cobra.Command {
 	cmd.Flags().BoolVar(&all, "all", false, "Include stopped/paused sandboxes")
 
 	return cmd
+}
+
+type sandboxInfoJSON struct {
+	Name      string    `json:"name"`
+	Template  string    `json:"template"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	IPv4      []string  `json:"ipv4,omitempty"`
+	IPv6      []string  `json:"ipv6,omitempty"`
 }

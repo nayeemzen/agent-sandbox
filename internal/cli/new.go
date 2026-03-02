@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -56,6 +57,15 @@ func newNewCmd(opts *GlobalOptions) *cobra.Command {
 				Names:    names,
 			})
 			if err != nil {
+				if errors.Is(err, templates.ErrNoTemplates) {
+					return fmt.Errorf("no templates available (run: sandbox init, or sandbox template add <name> <source>)")
+				}
+				if errors.Is(err, templates.ErrMultipleTemplates) {
+					return fmt.Errorf("multiple templates available (run: sandbox template ls; sandbox template default <name>; or pass --template)")
+				}
+				if errors.Is(err, templates.ErrTemplateNotFound) {
+					return fmt.Errorf("%v (run: sandbox template ls)", err)
+				}
 				return err
 			}
 

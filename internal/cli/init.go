@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -90,6 +91,9 @@ func runInit(ctx context.Context, opts *GlobalOptions, out io.Writer, source str
 		Names:   names,
 	})
 	if err != nil {
+		if errors.Is(err, templates.ErrMultipleTemplates) {
+			return fmt.Errorf("multiple templates available; run: sandbox template ls; sandbox template default <name>")
+		}
 		return fmt.Errorf("%v (run: sandbox template default <name>)", err)
 	}
 

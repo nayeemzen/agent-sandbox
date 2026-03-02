@@ -35,6 +35,7 @@ func TestRootHelpIncludesPlannedCommands(t *testing.T) {
 		"start",
 		"delete",
 		"monitor",
+		"completion",
 		"--json",
 	}
 

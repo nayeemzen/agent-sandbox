@@ -21,3 +21,4 @@
 - 2026-03-02 03:33 evidence: Smoke-tested `sandbox monitor --interval 1s` with a running sandbox and observed periodic refresh and per-sandbox memory display.
 - 2026-03-02 03:35 note: Added hermetic unit tests for config/state load-save behavior and centralized Incus “not found” error normalization with unit tests.
 - 2026-03-02 03:40 decision: Added GitHub Actions CI with unit tests on every push/PR and an Incus-backed integration test suite gated by build tag `integration`.
+- 2026-03-02 03:44 decision: Standardized `--json` output for key commands (`ls`, `template`, `doctor`) using explicit JSON structs/tags and added a `completion` command for shell completions.

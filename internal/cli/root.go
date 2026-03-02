@@ -53,6 +53,7 @@ func NewRootCmd() *cobra.Command {
 		newStartCmd(opts),
 		newDeleteCmd(opts),
 		newMonitorCmd(opts, time.Second*15),
+		newCompletionCmd(),
 	)
 
 	return cmd

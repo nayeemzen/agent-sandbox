@@ -40,7 +40,11 @@ func newDoctorCmd(opts *GlobalOptions) *cobra.Command {
 					},
 				}
 
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(res))
+				if opts.JSON {
+					_ = writeJSON(cmd.OutOrStdout(), res)
+				} else {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(res))
+				}
 				return fmt.Errorf("doctor failed")
 			}
 
@@ -48,7 +52,11 @@ func newDoctorCmd(opts *GlobalOptions) *cobra.Command {
 				LocalMode: opts.IncusRemoteURL == "",
 			})
 
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(results))
+			if opts.JSON {
+				_ = writeJSON(cmd.OutOrStdout(), results)
+			} else {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(results))
+			}
 			if doctor.ExitCode(results) != 0 {
 				return fmt.Errorf("doctor failed")
 			}
