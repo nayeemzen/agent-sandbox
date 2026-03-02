@@ -14,6 +14,7 @@ Preflight expectations:
 - The developer user can interact with Incus without sudo.
 - A trivial container instance can be created, started, exec’d into, and deleted.
 - Instances receive an IP on an Incus-managed bridge network.
+- If a host firewall is enabled (for example UFW), it must allow DHCP on the Incus bridge interface, otherwise instances may fail to receive IPv4 addresses.
 
 ## 1. Goals, Non-Goals, Success Criteria
 
