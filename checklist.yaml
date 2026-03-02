@@ -48,8 +48,8 @@ tasks:
 
   - id: TASK-005
     description: Phase 1 - Incus connectivity and sandbox doctor (local + remote, auth, readiness checks).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "5956d9899e38f76add7732a7f3b76daaf14a259f"
     failure_reason: ""
     acceptance_criteria:
       - sandbox doctor reports pass/warn/fail checks and exits non-zero on fail.
