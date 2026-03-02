@@ -134,8 +134,8 @@ tasks:
 
   - id: TASK-012
     description: Automated integration tests + CI (Incus backend end-to-end: template->new->exec/logs lifecycle).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "c11338fb83f7d308ba853bf4e055755924c3817b"
     failure_reason: ""
     acceptance_criteria:
       - Integration tests can run non-interactively and clean up after themselves.
