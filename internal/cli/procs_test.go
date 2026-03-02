@@ -91,7 +91,7 @@ func TestSelectProcForLogs(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected error")
 		}
-		if want := "available: a, b"; err.Error() == "" || !strings.Contains(err.Error(), want) {
+		if want := `process "c" not found in "sb1"`; !strings.Contains(err.Error(), want) {
 			t.Fatalf("error %q missing %q", err.Error(), want)
 		}
 	})
@@ -128,7 +128,7 @@ func TestSelectProcForLogs(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected error")
 		}
-		if want := "specify --proc"; err.Error() == "" || !strings.Contains(err.Error(), want) {
+		if want := `multiple processes found in "sb1"`; !strings.Contains(err.Error(), want) {
 			t.Fatalf("error %q missing %q", err.Error(), want)
 		}
 	})

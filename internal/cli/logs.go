@@ -135,7 +135,10 @@ func pickLogPathForSandbox(ctx context.Context, s incusclient.InstanceServer, sa
 	}
 
 	if len(logFiles) == 0 {
-		return "", fmt.Errorf("no managed procs recorded for %q and no log files found in /var/log/sandbox; start one with: sandbox exec %s --detach --name <proc> -- <cmd>", sandbox, sandbox)
+		return "", newCLIError(
+			fmt.Sprintf("no logs found for %q", sandbox),
+			fmt.Sprintf("Start a background process first:\n  sandbox exec %s --detach --name <proc> -- <cmd>", sandbox),
+		)
 	}
 
 	if len(logFiles) == 1 {

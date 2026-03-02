@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 
@@ -86,7 +87,7 @@ func newInstallCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if opts.IncusRemoteURL != "" {
-				return fmt.Errorf("sandbox install only supports local Incus setup (remove --incus-remote-url)")
+				return newCLIError("install only works with local Incus", "Remove the --incus-remote-url flag and try again")
 			}
 
 			rt := &installRuntime{
@@ -126,7 +127,7 @@ func newInstallCmd(opts *GlobalOptions) *cobra.Command {
 				if rt.tty {
 					_, _ = fmt.Fprint(rt.out, "\033[H\033[2J")
 				}
-				renderInstallChecklist(rt.out, steps)
+				renderInstallChecklist(rt.out, steps, rt.tty)
 			}
 
 			render()
@@ -153,9 +154,9 @@ func newInstallCmd(opts *GlobalOptions) *cobra.Command {
 				render()
 			}
 
-			_, _ = fmt.Fprintln(rt.out, "install complete")
+			renderSuccess(rt.out, "Install complete")
 			if rt.addedGroup && !rt.useSGForFollow {
-				_, _ = fmt.Fprintf(rt.out, "note: added %q to incus-admin; open a new shell session before running sandbox commands.\n", rt.username)
+				renderWarning(rt.out, fmt.Sprintf("Added %q to incus-admin — open a new shell session before running sandbox commands.", rt.username))
 			}
 			return nil
 		},
@@ -166,12 +167,32 @@ func newInstallCmd(opts *GlobalOptions) *cobra.Command {
 	return cmd
 }
 
-func renderInstallChecklist(w io.Writer, steps []installStep) {
-	_, _ = fmt.Fprintln(w, "sandbox install checklist")
+func renderInstallChecklist(w io.Writer, steps []installStep, tty bool) {
+	if tty {
+		_, _ = fmt.Fprintln(w, headerStyle.Render("sandbox install"))
+	} else {
+		_, _ = fmt.Fprintln(w, "sandbox install checklist")
+	}
 	for _, s := range steps {
-		_, _ = fmt.Fprintf(w, "%s %s\n", installStepMarker(s.Status), s.Title)
+		marker := installStepStyledMarker(s.Status, tty)
+		title := s.Title
+		if tty {
+			switch s.Status {
+			case installRunning:
+				title = lipgloss.NewStyle().Bold(true).Render(title)
+			case installComplete:
+				title = lipgloss.NewStyle().Foreground(colorGreen).Render(title)
+			case installFailed:
+				title = lipgloss.NewStyle().Foreground(colorRed).Render(title)
+			}
+		}
+		_, _ = fmt.Fprintf(w, "%s %s\n", marker, title)
 		if strings.TrimSpace(s.Details) != "" {
-			_, _ = fmt.Fprintf(w, "    %s\n", s.Details)
+			detail := s.Details
+			if tty {
+				detail = dimStyle.Render(detail)
+			}
+			_, _ = fmt.Fprintf(w, "    %s\n", detail)
 		}
 	}
 	_, _ = fmt.Fprintln(w)

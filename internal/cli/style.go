@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,10 +24,15 @@ var (
 
 // Reusable styles.
 var (
-	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(colorWhite)
-	boldGreen   = lipgloss.NewStyle().Bold(true).Foreground(colorGreen)
-	labelStyle  = lipgloss.NewStyle().Bold(true)
-	cyanStyle   = lipgloss.NewStyle().Foreground(colorCyan)
+	headerStyle  = lipgloss.NewStyle().Bold(true).Foreground(colorWhite)
+	boldGreen    = lipgloss.NewStyle().Bold(true).Foreground(colorGreen)
+	labelStyle   = lipgloss.NewStyle().Bold(true)
+	cyanStyle    = lipgloss.NewStyle().Foreground(colorCyan)
+	dimStyle     = lipgloss.NewStyle().Foreground(colorGray)
+	errorStyle   = lipgloss.NewStyle().Bold(true).Foreground(colorRed)
+	warnStyle    = lipgloss.NewStyle().Bold(true).Foreground(colorYellow)
+	successStyle = lipgloss.NewStyle().Bold(true).Foreground(colorGreen)
+	hintStyle    = lipgloss.NewStyle().Foreground(colorCyan)
 )
 
 // colorizeStatus colors a sandbox state string for TTY output.
@@ -100,5 +106,87 @@ func renderTable(w io.Writer, headers []string, rows [][]string) {
 		fmt.Fprint(w, styledTable(headers, rows))
 	} else {
 		fmt.Fprint(w, plainTable(headers, rows))
+	}
+}
+
+// --- Styled message helpers (TTY-aware) ---
+
+// renderError writes a styled error message. If hint is non-empty a cyan Hint line follows.
+func renderError(w io.Writer, msg string, hint string) {
+	if isTTY(w) {
+		fmt.Fprintln(w, errorStyle.Render("Error:")+" "+msg)
+	} else {
+		fmt.Fprintln(w, "Error: "+msg)
+	}
+	if strings.TrimSpace(hint) != "" {
+		renderHint(w, hint)
+	}
+}
+
+// renderSuccess writes a green "✓ msg" on TTY, or plain "msg" otherwise.
+func renderSuccess(w io.Writer, msg string) {
+	if isTTY(w) {
+		fmt.Fprintln(w, successStyle.Render("✓")+" "+msg)
+	} else {
+		fmt.Fprintln(w, msg)
+	}
+}
+
+// renderWarning writes a styled warning message.
+func renderWarning(w io.Writer, msg string) {
+	if isTTY(w) {
+		fmt.Fprintln(w, warnStyle.Render("Warning:")+" "+msg)
+	} else {
+		fmt.Fprintln(w, "Warning: "+msg)
+	}
+}
+
+// renderHint writes a standalone cyan hint line.
+func renderHint(w io.Writer, msg string) {
+	if isTTY(w) {
+		fmt.Fprintln(w, hintStyle.Render("Hint:")+" "+msg)
+	} else {
+		fmt.Fprintln(w, "Hint: "+msg)
+	}
+}
+
+// CLIError is an error with a user-facing hint for recovery.
+type CLIError struct {
+	Message string
+	Hint    string
+}
+
+func (e *CLIError) Error() string { return e.Message }
+
+func newCLIError(msg, hint string) *CLIError {
+	return &CLIError{Message: msg, Hint: hint}
+}
+
+// HandleError renders any error to w. It extracts the hint from CLIError if present.
+func HandleError(w io.Writer, err error) {
+	var ce *CLIError
+	if errors.As(err, &ce) {
+		renderError(w, ce.Message, ce.Hint)
+		return
+	}
+	renderError(w, err.Error(), "")
+}
+
+// installStepStyledMarker returns a colored Unicode marker on TTY, ASCII on non-TTY.
+func installStepStyledMarker(status installStepStatus, tty bool) string {
+	if !tty {
+		return installStepMarker(status)
+	}
+	switch status {
+	case installComplete:
+		return lipgloss.NewStyle().Bold(true).Foreground(colorGreen).Render("✓")
+	case installFailed:
+		return lipgloss.NewStyle().Bold(true).Foreground(colorRed).Render("✗")
+	case installRunning:
+		return lipgloss.NewStyle().Bold(true).Foreground(colorYellow).Render("●")
+	case installSkipped:
+		return dimStyle.Render("−")
+	default: // pending
+		return dimStyle.Render("◌")
 	}
 }

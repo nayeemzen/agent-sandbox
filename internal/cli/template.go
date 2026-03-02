@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/nayeemzen/agent-sandbox/internal/incus"
 	"github.com/spf13/cobra"
 )
@@ -73,7 +72,7 @@ func newTemplateAddCmd(opts *GlobalOptions) *cobra.Command {
 				})
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "template %s created (alias=%s fingerprint=%s)\n", tpl.Name, tpl.Alias, shortFingerprint(tpl.Fingerprint))
+			renderSuccess(cmd.OutOrStdout(), fmt.Sprintf("template %s created (alias=%s fingerprint=%s)", tpl.Name, tpl.Alias, shortFingerprint(tpl.Fingerprint)))
 			return nil
 		},
 	}
@@ -140,19 +139,16 @@ func newTemplateLsCmd(opts *GlobalOptions) *cobra.Command {
 			out := cmd.OutOrStdout()
 			tty := isTTY(out)
 
-			headers := []string{"NAME", "DEFAULT", "SOURCE", "AGE", "FINGERPRINT"}
+			headers := []string{"NAME", "SOURCE", "AGE", "FINGERPRINT"}
 			rows := make([][]string, 0, len(templates))
 			now := time.Now()
 			for _, t := range templates {
-				isDefault := "no"
+				name := t.Name
 				if cfg.DefaultTemplate == t.Name {
-					isDefault = "yes"
-				}
-				if tty {
-					if isDefault == "yes" {
-						isDefault = lipgloss.NewStyle().Foreground(colorGreen).Render("yes")
+					if tty {
+						name = t.Name + " " + dimStyle.Render("(default)")
 					} else {
-						isDefault = lipgloss.NewStyle().Foreground(colorGray).Render("no")
+						name = t.Name + " (default)"
 					}
 				}
 
@@ -166,7 +162,7 @@ func newTemplateLsCmd(opts *GlobalOptions) *cobra.Command {
 					src = "-"
 				}
 
-				rows = append(rows, []string{t.Name, isDefault, src, age, shortFingerprint(t.Fingerprint)})
+				rows = append(rows, []string{name, src, age, shortFingerprint(t.Fingerprint)})
 			}
 
 			renderTable(out, headers, rows)
@@ -215,7 +211,7 @@ func newTemplateRmCmd(opts *GlobalOptions) *cobra.Command {
 
 			if all {
 				if !yes {
-					return fmt.Errorf("refusing to remove all templates without --yes")
+					return newCLIError("removing all templates requires confirmation", "Add --yes to confirm")
 				}
 
 				templates, err := incus.ListTemplates(s)
@@ -321,7 +317,7 @@ func newTemplateDefaultCmd(opts *GlobalOptions) *cobra.Command {
 			if exists, err := incus.TemplateExists(s, name); err != nil {
 				return err
 			} else if !exists {
-				return fmt.Errorf("template %q does not exist", name)
+				return newCLIError(fmt.Sprintf("template %q not found", name), "List available templates: sandbox template ls")
 			}
 
 			cfg.DefaultTemplate = name

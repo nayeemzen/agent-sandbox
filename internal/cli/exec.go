@@ -39,9 +39,11 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 			ctx, stop := signal.NotifyContext(baseCtx, os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
+			errw := cmd.ErrOrStderr()
+
 			s, err := connectIncus(ctx, opts)
 			if err != nil {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+				HandleError(errw, err)
 				return ExitCodeError{Code: 1}
 			}
 
@@ -50,60 +52,60 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 			if len(args) == 0 {
 				sandboxes, err := incus.ListSandboxes(s, false)
 				if err != nil {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					HandleError(errw, err)
 					return ExitCodeError{Code: 1}
 				}
 
 				sandboxName, err = pickRequiredArg("sandbox", "Select sandbox for exec", sandboxOptionsFromIncus(sandboxes))
 				if err != nil {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					HandleError(errw, err)
 					return ExitCodeError{Code: 1}
 				}
 			} else {
 				sandboxName, guestCmd, err = parseExecArgs(cmd, args)
 				if err != nil {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					HandleError(errw, err)
 					return ExitCodeError{Code: 1}
 				}
 			}
 
 			sb, err := incus.GetSandbox(s, sandboxName)
 			if err != nil {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+				HandleError(errw, err)
 				return ExitCodeError{Code: 1}
 			}
 			if !sb.Managed {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %q is not a sandbox-managed instance\n", sandboxName)
+				renderError(errw, fmt.Sprintf("%q is not a sandbox-managed instance", sandboxName), "")
 				return ExitCodeError{Code: 1}
 			}
 			if !strings.EqualFold(sb.Status, "running") {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %q is not running (state=%s)\n", sandboxName, sb.Status)
+				renderError(errw, fmt.Sprintf("%q is not running (state=%s)", sandboxName, sb.Status), "")
 				return ExitCodeError{Code: 1}
 			}
 
 			if detach {
 				if procName == "" {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error: --name is required with --detach")
+					renderError(errw, "--name is required with --detach", "Usage: sandbox exec <sandbox> --detach --name <proc> -- <cmd>")
 					return ExitCodeError{Code: 1}
 				}
 				if err := validateProcName(procName); err != nil {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					HandleError(errw, err)
 					return ExitCodeError{Code: 1}
 				}
 				if len(guestCmd) == 0 {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error: a command is required with --detach")
+					renderError(errw, "a command is required with --detach", "Usage: sandbox exec <sandbox> --detach --name <proc> -- <cmd>")
 					return ExitCodeError{Code: 1}
 				}
 
 				pid, err := startDetachedProc(ctx, s, sandboxName, procName, guestCmd)
 				if err != nil {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					HandleError(errw, err)
 					return ExitCodeError{Code: 1}
 				}
 
 				st, stPath, err := loadState(opts)
 				if err != nil {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					HandleError(errw, err)
 					return ExitCodeError{Code: 1}
 				}
 
@@ -119,7 +121,7 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 				}
 				upsertManagedProc(&st, proc)
 				if err := saveState(stPath, st); err != nil {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					HandleError(errw, err)
 					return ExitCodeError{Code: 1}
 				}
 
@@ -150,7 +152,7 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 				if stdinFile, ok := cmd.InOrStdin().(*os.File); ok && term.IsTerminal(int(stdinFile.Fd())) {
 					oldState, err := term.MakeRaw(int(stdinFile.Fd()))
 					if err != nil {
-						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error: failed to enter raw terminal mode:", err)
+						renderError(errw, fmt.Sprintf("failed to enter raw terminal mode: %v", err), "")
 						return ExitCodeError{Code: 1}
 					}
 					defer func() {
@@ -165,7 +167,7 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 				if errors.Is(err, context.Canceled) {
 					return ExitCodeError{Code: 130}
 				}
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+				HandleError(errw, err)
 				return ExitCodeError{Code: 1}
 			}
 

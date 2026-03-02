@@ -42,11 +42,16 @@ func newSetupCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			out := cmd.OutOrStdout()
 			results := incus.RunDoctor(ctx, s, incus.DoctorOptions{LocalMode: plan.LocalMode})
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(results))
+			if isTTY(out) {
+				_, _ = fmt.Fprintln(out, doctor.RenderStyledHuman(results))
+			} else {
+				_, _ = fmt.Fprintln(out, doctor.RenderHuman(results))
+			}
 
 			if doctor.ExitCode(results) != 0 {
-				return fmt.Errorf("setup failed (fix failing checks and retry)")
+				return newCLIError("setup failed — fix the failing checks above and retry", "Run sandbox doctor for detailed diagnostics")
 			}
 
 			if plan.LocalMode {
@@ -61,7 +66,7 @@ func newSetupCmd(opts *GlobalOptions) *cobra.Command {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Skipping template init (--no-init). Run: sandbox init")
 			}
 
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "setup complete")
+			renderSuccess(cmd.OutOrStdout(), "setup complete")
 			return nil
 		},
 	}

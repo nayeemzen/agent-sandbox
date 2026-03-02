@@ -46,10 +46,14 @@ func selectProcForLogs(sandbox string, procs map[string]state.ManagedProc, expli
 	if explicit != "" {
 		p, ok := procs[explicit]
 		if !ok {
-			if len(candidates) == 0 {
-				return state.ManagedProc{}, fmt.Errorf("managed proc %q not found in %q (no managed procs recorded)", explicit, sandbox)
+			hint := ""
+			if len(candidates) > 0 {
+				hint = "Available processes: " + strings.Join(candidates, ", ")
 			}
-			return state.ManagedProc{}, fmt.Errorf("managed proc %q not found in %q (available: %s)", explicit, sandbox, strings.Join(candidates, ", "))
+			return state.ManagedProc{}, newCLIError(
+				fmt.Sprintf("process %q not found in %q", explicit, sandbox),
+				hint,
+			)
 		}
 		if p.Name == "" {
 			p.Name = explicit
@@ -69,7 +73,10 @@ func selectProcForLogs(sandbox string, procs map[string]state.ManagedProc, expli
 		return p, nil
 	}
 
-	return state.ManagedProc{}, fmt.Errorf("multiple managed procs recorded for %q; specify --proc (available: %s)", sandbox, strings.Join(candidates, ", "))
+	return state.ManagedProc{}, newCLIError(
+		fmt.Sprintf("multiple processes found in %q", sandbox),
+		fmt.Sprintf("Specify which one: --proc <name>\n  Available: %s", strings.Join(candidates, ", ")),
+	)
 }
 
 func sortedKeys[K comparable, V any](m map[K]V) []string {

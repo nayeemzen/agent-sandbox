@@ -25,7 +25,7 @@ func NewRootCmd() *cobra.Command {
 		Use:           "sandbox",
 		Short:         "Incus-first sandboxes with a minimal CLI",
 		SilenceUsage:  true,
-		SilenceErrors: false,
+		SilenceErrors: true,
 	}
 
 	cmd.PersistentFlags().BoolVar(&opts.JSON, "json", false, "Output machine-readable JSON")

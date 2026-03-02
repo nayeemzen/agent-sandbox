@@ -20,11 +20,17 @@ type selectOption struct {
 
 func pickRequiredArg(argName string, prompt string, options []selectOption) (string, error) {
 	if len(options) == 0 {
-		return "", fmt.Errorf("missing required argument %q and no options are available", argName)
+		return "", newCLIError(
+			fmt.Sprintf("no %ss found", argName),
+			fmt.Sprintf("Create one first: sandbox new <name>"),
+		)
 	}
 
 	if !isSelectionTTY() {
-		return "", fmt.Errorf("missing required argument %q (interactive selection requires a TTY)", argName)
+		return "", newCLIError(
+			fmt.Sprintf("missing required argument: %s", argName),
+			"Provide it as an argument, or run in a terminal for interactive selection",
+		)
 	}
 
 	items := make([]string, 0, len(options))

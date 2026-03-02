@@ -20,7 +20,15 @@ func newNewCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "new <name>",
 		Short:         "Create a sandbox quickly from an existing template (fast path)",
-		Args:          cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return newCLIError("missing required argument: name", "Usage: sandbox new <name>")
+			}
+			if len(args) > 1 {
+				return newCLIError("too many arguments (expected 1)", "Usage: sandbox new <name>")
+			}
+			return nil
+		},
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
