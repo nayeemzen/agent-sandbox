@@ -24,8 +24,8 @@ tasks:
 
   - id: TASK-003
     description: Set up Incus locally (dev preflight) and confirm it works end-to-end for container instances.
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "80e614243467d2b8d686cd9ed687ab6e18651dd8"
     failure_reason: ""
     acceptance_criteria:
       - Incus daemon is installed and running locally.
