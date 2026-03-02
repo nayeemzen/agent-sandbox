@@ -17,3 +17,5 @@
 - 2026-03-02 03:24 evidence: Smoke-tested `sandbox exec` exit code propagation, `exec --detach`, `ps`, `logs` (tail), and `kill` against a local Incus daemon.
 - 2026-03-02 03:27 decision: `sandbox setup` is a safe orchestrator: runs doctor, prints remediation, and optionally runs `sandbox init`; it does not attempt to install/configure `incusd` itself in v1.
 - 2026-03-02 03:27 evidence: Smoke-tested `sandbox setup --no-init` on a local Incus daemon.
+- 2026-03-02 03:33 decision: `sandbox monitor` parses Incus Prometheus text metrics; CPU comes from `incus_cpu_seconds_total`, net from `incus_network_{receive,transmit}_bytes_total`, and memory is approximated as `incus_memory_{Active,Inactive}_bytes` summed.
+- 2026-03-02 03:33 evidence: Smoke-tested `sandbox monitor --interval 1s` with a running sandbox and observed periodic refresh and per-sandbox memory display.
