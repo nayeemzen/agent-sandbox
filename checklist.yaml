@@ -145,8 +145,8 @@ tasks:
 
   - id: TASK-013
     description: Phase 7 - Polish (json output, error consistency, completions).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "2ed68b75fcf2ea9a0c41f79e3e723ac921757c6b"
     failure_reason: ""
     acceptance_criteria:
       - Key commands support --json with stable fields.
