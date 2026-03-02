@@ -3,6 +3,8 @@ package doctor
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 type Status string
@@ -48,6 +50,58 @@ func RenderHuman(results []CheckResult) string {
 		if strings.TrimSpace(r.Remediation) != "" {
 			b.WriteString("\n  Remediation: ")
 			b.WriteString(strings.ReplaceAll(strings.TrimRight(r.Remediation, "\n"), "\n", "\n  "))
+		}
+	}
+
+	return b.String()
+}
+
+// Theme colors (match cli/style.go).
+var (
+	styledGreen  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
+	styledRed    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
+	styledYellow = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3"))
+	styledGray   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	styledCyan   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+)
+
+// RenderStyledHuman renders check results with colored Unicode markers for TTY output.
+func RenderStyledHuman(results []CheckResult) string {
+	var b strings.Builder
+
+	for i, r := range results {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+
+		var marker, label string
+		switch r.Status {
+		case Pass:
+			marker = styledGreen.Render("✓")
+			label = styledGreen.Render("PASS")
+		case Warn:
+			marker = styledYellow.Render("●")
+			label = styledYellow.Render("WARN")
+		case Fail:
+			marker = styledRed.Render("✗")
+			label = styledRed.Render("FAIL")
+		default:
+			marker = " "
+			label = strings.ToUpper(string(r.Status))
+		}
+
+		b.WriteString(fmt.Sprintf("%s %s %s: %s", marker, label, r.ID, r.Summary))
+
+		if strings.TrimSpace(r.Details) != "" {
+			detail := strings.ReplaceAll(strings.TrimRight(r.Details, "\n"), "\n", "\n    ")
+			b.WriteString("\n    ")
+			b.WriteString(styledGray.Render(detail))
+		}
+
+		if strings.TrimSpace(r.Remediation) != "" {
+			rem := strings.ReplaceAll(strings.TrimRight(r.Remediation, "\n"), "\n", "\n    ")
+			b.WriteString("\n    ")
+			b.WriteString(styledCyan.Render("Hint: "+rem))
 		}
 	}
 

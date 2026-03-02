@@ -13,6 +13,7 @@ func main() {
 		if errors.As(err, &ec) {
 			os.Exit(ec.Code)
 		}
+		cli.HandleError(os.Stderr, err)
 		os.Exit(1)
 	}
 }

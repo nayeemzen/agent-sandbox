@@ -24,6 +24,19 @@ func newDoctorCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
+			out := cmd.OutOrStdout()
+			tty := isTTY(out)
+
+			renderResults := func(res []doctor.CheckResult) {
+				if opts.JSON {
+					_ = writeJSON(out, res)
+				} else if tty {
+					_, _ = fmt.Fprintln(out, doctor.RenderStyledHuman(res))
+				} else {
+					_, _ = fmt.Fprintln(out, doctor.RenderHuman(res))
+				}
+			}
+
 			s, err := incus.Connect(ctx, incus.ConnectOptions{
 				UnixSocket:         opts.IncusUnixSocket,
 				RemoteURL:          opts.IncusRemoteURL,
@@ -39,26 +52,17 @@ func newDoctorCmd(opts *GlobalOptions) *cobra.Command {
 						Remediation: remediationForConnectError(err),
 					},
 				}
-
-				if opts.JSON {
-					_ = writeJSON(cmd.OutOrStdout(), res)
-				} else {
-					_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(res))
-				}
-				return fmt.Errorf("doctor failed")
+				renderResults(res)
+				return newCLIError("doctor failed", "Fix the failing checks above and retry")
 			}
 
 			results := incus.RunDoctor(ctx, s, incus.DoctorOptions{
 				LocalMode: opts.IncusRemoteURL == "",
 			})
 
-			if opts.JSON {
-				_ = writeJSON(cmd.OutOrStdout(), results)
-			} else {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), doctor.RenderHuman(results))
-			}
+			renderResults(results)
 			if doctor.ExitCode(results) != 0 {
-				return fmt.Errorf("doctor failed")
+				return newCLIError("doctor failed", "Fix the failing checks above and retry")
 			}
 
 			return nil

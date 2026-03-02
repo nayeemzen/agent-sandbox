@@ -292,7 +292,7 @@ func newDeleteCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if !force && !yes {
-				return fmt.Errorf("refusing to delete without --yes (or use --force)")
+				return newCLIError("deletion requires confirmation", "Add --yes to confirm, or --force to stop and delete immediately")
 			}
 
 			s, err := connectIncus(ctx, opts)
@@ -379,6 +379,6 @@ func chooseSandboxArg(s incusclient.InstanceServer, args []string, argName strin
 	case 1:
 		return args[0], nil
 	default:
-		return "", fmt.Errorf("too many arguments")
+		return "", newCLIError("too many arguments (expected at most 1)", "Usage: sandbox <command> [name]")
 	}
 }
