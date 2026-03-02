@@ -20,3 +20,4 @@
 - 2026-03-02 03:33 decision: `sandbox monitor` parses Incus Prometheus text metrics; CPU comes from `incus_cpu_seconds_total`, net from `incus_network_{receive,transmit}_bytes_total`, and memory is approximated as `incus_memory_{Active,Inactive}_bytes` summed.
 - 2026-03-02 03:33 evidence: Smoke-tested `sandbox monitor --interval 1s` with a running sandbox and observed periodic refresh and per-sandbox memory display.
 - 2026-03-02 03:35 note: Added hermetic unit tests for config/state load-save behavior and centralized Incus “not found” error normalization with unit tests.
+- 2026-03-02 03:40 decision: Added GitHub Actions CI with unit tests on every push/PR and an Incus-backed integration test suite gated by build tag `integration`.

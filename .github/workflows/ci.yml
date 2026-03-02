@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Go Test
+        run: go test ./...
+
+  integration:
+    name: Integration Tests (Incus)
+    runs-on: ubuntu-24.04
+    needs: unit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Incus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y incus
+
+      - name: Init Incus (Minimal)
+        run: |
+          sudo incus admin init --minimal
+          sudo incus info
+
+      - name: Go Test (Integration)
+        run: |
+          sudo env "PATH=$PATH" go test -tags=integration ./internal/integration -run TestIncusEndToEnd_TemplateNewExecDetachLogsKill
