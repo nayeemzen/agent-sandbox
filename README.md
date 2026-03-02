@@ -27,7 +27,7 @@ Agents execute untrusted code. They install packages, run builds, hit APIs, and 
 
 Existing options have tradeoffs:
 
-- **Docker** is built for app packaging, not interactive sandboxes. No init system, awkward exec model, hard to get a "real machine" feel.
+- **Docker** is a single-process application container. Agents need a general-purpose machine -- multiple services, package managers, init, systemd units, cron. Docker-in-Docker (dind) is fragile, requires privileged mode or complex socket mounts, and nested `docker compose` stacks hit storage driver and networking issues that don't exist on a real host.
 - **MicroVMs** (Firecracker) boot fast but require kernel images, rootfs management, and custom orchestration. Higher resource overhead per instance than containers.
 - **Traditional VMs** (QEMU/KVM) are strong isolation but slow to boot and heavy on resources.
 - **Namespaces/seccomp wrappers** (bubblewrap, nsjail) are low-level and require significant glue code.
