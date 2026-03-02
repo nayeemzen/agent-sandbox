@@ -17,7 +17,7 @@ func newKillCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "kill <sandbox> <proc>",
 		Short:         "Stop a managed process in a sandbox",
-		Args:          cobra.ExactArgs(2),
+		Args:          cobra.MaximumNArgs(2),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -26,12 +26,30 @@ func newKillCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			sandbox := args[0]
-			procName := args[1]
-
 			st, stPath, err := loadState(opts)
 			if err != nil {
 				return err
+			}
+
+			var sandbox string
+			var procName string
+
+			if len(args) >= 1 {
+				sandbox = args[0]
+			} else {
+				sandbox, err = pickRequiredArg("sandbox", "Select sandbox for kill", procSandboxOptionsFromState(st))
+				if err != nil {
+					return err
+				}
+			}
+
+			if len(args) >= 2 {
+				procName = args[1]
+			} else {
+				procName, err = pickRequiredArg("proc", "Select managed process to kill", procOptionsFromState(st, sandbox))
+				if err != nil {
+					return err
+				}
 			}
 
 			pmap := st.Procs[sandbox]
@@ -108,6 +126,9 @@ rm -f "$pidfile"
 				return err
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"sandbox": sandbox, "proc": procName, "status": "stopped"})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s/%s stopped\n", sandbox, procName)
 			return nil
 		},

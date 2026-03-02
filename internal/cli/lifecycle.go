@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	incusclient "github.com/lxc/incus/v6/client"
 	"github.com/spf13/cobra"
 
 	"github.com/nayeemzen/agent-sandbox/internal/incus"
@@ -16,7 +17,7 @@ func newPauseCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "pause <name>",
 		Short:         "Pause a running sandbox",
-		Args:          cobra.ExactArgs(1),
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -25,9 +26,13 @@ func newPauseCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			name := args[0]
-
 			s, err := connectIncus(ctx, opts)
+			if err != nil {
+				return err
+			}
+			name, err := chooseSandboxArg(s, args, "sandbox", "Select sandbox to pause", func(sb incus.Sandbox) bool {
+				return strings.EqualFold(sb.Status, "running")
+			})
 			if err != nil {
 				return err
 			}
@@ -41,6 +46,9 @@ func newPauseCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if strings.EqualFold(sb.Status, "frozen") {
+				if opts.JSON {
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "already_paused"})
+				}
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s already paused\n", name)
 				return nil
 			}
@@ -57,6 +65,9 @@ func newPauseCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "paused"})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s paused\n", name)
 			return nil
 		},
@@ -69,7 +80,7 @@ func newResumeCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "resume <name>",
 		Short:         "Resume a paused sandbox",
-		Args:          cobra.ExactArgs(1),
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -78,9 +89,13 @@ func newResumeCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			name := args[0]
-
 			s, err := connectIncus(ctx, opts)
+			if err != nil {
+				return err
+			}
+			name, err := chooseSandboxArg(s, args, "sandbox", "Select sandbox to resume", func(sb incus.Sandbox) bool {
+				return strings.EqualFold(sb.Status, "frozen")
+			})
 			if err != nil {
 				return err
 			}
@@ -94,6 +109,9 @@ func newResumeCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if !strings.EqualFold(sb.Status, "frozen") {
+				if opts.JSON {
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "not_paused"})
+				}
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s is not paused (state=%s)\n", name, sb.Status)
 				return nil
 			}
@@ -110,6 +128,9 @@ func newResumeCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "resumed"})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s resumed\n", name)
 			return nil
 		},
@@ -124,7 +145,7 @@ func newStopCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "stop <name>",
 		Short:         "Stop a running sandbox",
-		Args:          cobra.ExactArgs(1),
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -133,9 +154,13 @@ func newStopCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			name := args[0]
-
 			s, err := connectIncus(ctx, opts)
+			if err != nil {
+				return err
+			}
+			name, err := chooseSandboxArg(s, args, "sandbox", "Select sandbox to stop", func(sb incus.Sandbox) bool {
+				return !strings.EqualFold(sb.Status, "stopped")
+			})
 			if err != nil {
 				return err
 			}
@@ -149,6 +174,9 @@ func newStopCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if strings.EqualFold(sb.Status, "stopped") {
+				if opts.JSON {
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "already_stopped"})
+				}
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s already stopped\n", name)
 				return nil
 			}
@@ -165,6 +193,9 @@ func newStopCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "stopped"})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s stopped\n", name)
 			return nil
 		},
@@ -178,7 +209,7 @@ func newStartCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "start <name>",
 		Short:         "Start a stopped sandbox",
-		Args:          cobra.ExactArgs(1),
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -187,9 +218,13 @@ func newStartCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			name := args[0]
-
 			s, err := connectIncus(ctx, opts)
+			if err != nil {
+				return err
+			}
+			name, err := chooseSandboxArg(s, args, "sandbox", "Select sandbox to start", func(sb incus.Sandbox) bool {
+				return !strings.EqualFold(sb.Status, "running")
+			})
 			if err != nil {
 				return err
 			}
@@ -203,6 +238,9 @@ func newStartCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if strings.EqualFold(sb.Status, "running") {
+				if opts.JSON {
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "already_running"})
+				}
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s already running\n", name)
 				return nil
 			}
@@ -226,6 +264,9 @@ func newStartCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "started"})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s started\n", name)
 			return nil
 		},
@@ -241,7 +282,7 @@ func newDeleteCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "delete <name>",
 		Short:         "Delete a sandbox",
-		Args:          cobra.ExactArgs(1),
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -250,13 +291,15 @@ func newDeleteCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			name := args[0]
-
 			if !force && !yes {
-				return fmt.Errorf("refusing to delete %q without --yes (or use --force)", name)
+				return fmt.Errorf("refusing to delete without --yes (or use --force)")
 			}
 
 			s, err := connectIncus(ctx, opts)
+			if err != nil {
+				return err
+			}
+			name, err := chooseSandboxArg(s, args, "sandbox", "Select sandbox to delete", nil)
 			if err != nil {
 				return err
 			}
@@ -276,6 +319,9 @@ func newDeleteCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "deleted"})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s deleted\n", name)
 			return nil
 		},
@@ -311,4 +357,28 @@ func removeSandboxState(opts *GlobalOptions, name string) error {
 	delete(st.Sandboxes, name)
 	delete(st.Procs, name)
 	return saveState(stPath, st)
+}
+
+func chooseSandboxArg(s incusclient.InstanceServer, args []string, argName string, prompt string, filter func(incus.Sandbox) bool) (string, error) {
+	switch len(args) {
+	case 0:
+		sandboxes, err := incus.ListSandboxes(s, true)
+		if err != nil {
+			return "", err
+		}
+		if filter != nil {
+			filtered := make([]incus.Sandbox, 0, len(sandboxes))
+			for _, sb := range sandboxes {
+				if filter(sb) {
+					filtered = append(filtered, sb)
+				}
+			}
+			sandboxes = filtered
+		}
+		return pickRequiredArg(argName, prompt, sandboxOptionsFromIncus(sandboxes))
+	case 1:
+		return args[0], nil
+	default:
+		return "", fmt.Errorf("too many arguments")
+	}
 }

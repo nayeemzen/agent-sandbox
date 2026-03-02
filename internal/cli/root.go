@@ -37,6 +37,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&opts.IncusInsecure, "incus-insecure", false, "Skip TLS verification for --incus-remote-url (debug only)")
 
 	cmd.AddCommand(
+		newInstallCmd(opts),
 		newSetupCmd(opts),
 		newDoctorCmd(opts),
 		newInitCmd(opts),

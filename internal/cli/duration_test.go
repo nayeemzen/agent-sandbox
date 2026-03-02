@@ -31,15 +31,15 @@ func TestClassifyNewDuration(t *testing.T) {
 	}
 }
 
-func TestFormatNewDuration_TTY_FastHasEmojiAndANSI(t *testing.T) {
+func TestFormatNewDuration_TTY_FastHasEmojiAndContent(t *testing.T) {
 	t.Parallel()
 
 	emoji, rendered := formatNewDuration(2*time.Second, true)
 	if emoji != "⚡️" {
 		t.Fatalf("emoji = %q, want %q", emoji, "⚡️")
 	}
-	if !strings.Contains(rendered, "\033[") {
-		t.Fatalf("rendered duration missing ANSI codes: %q", rendered)
+	if !strings.Contains(rendered, "2.00s") {
+		t.Fatalf("rendered duration missing content: %q", rendered)
 	}
 }
 

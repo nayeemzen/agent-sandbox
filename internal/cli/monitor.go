@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	incusclient "github.com/lxc/incus/v6/client"
 	"github.com/spf13/cobra"
 
 	"github.com/nayeemzen/agent-sandbox/internal/incus"
@@ -18,6 +20,7 @@ import (
 
 func newMonitorCmd(opts *GlobalOptions, defaultInterval time.Duration) *cobra.Command {
 	var interval time.Duration
+	var showAll bool
 
 	cmd := &cobra.Command{
 		Use:           "monitor",
@@ -46,6 +49,11 @@ func newMonitorCmd(opts *GlobalOptions, defaultInterval time.Duration) *cobra.Co
 			out := cmd.OutOrStdout()
 			tty := isTTY(out)
 
+			// --json: single snapshot, no loop.
+			if opts.JSON {
+				return monitorJSONSnapshot(ctx, s, opts, out, hostCPUs, hostMemTotal, showAll)
+			}
+
 			var prevSnap monitor.Snapshot
 			var prevAt time.Time
 			havePrev := false
@@ -60,7 +68,8 @@ func newMonitorCmd(opts *GlobalOptions, defaultInterval time.Duration) *cobra.Co
 				if err != nil {
 					return err
 				}
-				sort.Slice(sandboxes, func(i, j int) bool { return sandboxes[i].Name < sandboxes[j].Name })
+				sortSandboxesForMonitor(sandboxes)
+				sandboxes = filterSandboxesForMonitor(sandboxes, showAll)
 
 				metricsText, metricsErr := s.GetMetrics()
 				var snap monitor.Snapshot
@@ -83,8 +92,21 @@ func newMonitorCmd(opts *GlobalOptions, defaultInterval time.Duration) *cobra.Co
 					_, _ = fmt.Fprint(out, "\033[H\033[2J")
 				}
 
-				_, _ = fmt.Fprintf(out, "sandbox monitor (interval=%s) updated=%s\n", interval, now.Format(time.RFC3339))
-				_, _ = fmt.Fprintf(out, "host: cpu=%d mem_total=%s mem_avail=%s\n", hostCPUs, humanBytes(float64(hostMemTotal)), humanBytes(float64(hostMemAvail)))
+				// Header lines.
+				if tty {
+					_, _ = fmt.Fprintf(out, "%s (interval=%s) updated=%s\n",
+						labelStyle.Render("sandbox monitor"),
+						cyanStyle.Render(interval.String()),
+						cyanStyle.Render(now.Format(time.RFC3339)))
+					_, _ = fmt.Fprintf(out, "%s cpu=%s mem_total=%s mem_avail=%s\n",
+						labelStyle.Render("host:"),
+						cyanStyle.Render(fmt.Sprintf("%d", hostCPUs)),
+						cyanStyle.Render(humanBytes(float64(hostMemTotal))),
+						cyanStyle.Render(humanBytes(float64(hostMemAvail))))
+				} else {
+					_, _ = fmt.Fprintf(out, "sandbox monitor (interval=%s) updated=%s\n", interval, now.Format(time.RFC3339))
+					_, _ = fmt.Fprintf(out, "host: cpu=%d mem_total=%s mem_avail=%s\n", hostCPUs, humanBytes(float64(hostMemTotal)), humanBytes(float64(hostMemAvail)))
+				}
 
 				if metricsErr != nil {
 					_, _ = fmt.Fprintf(out, "WARN: metrics unavailable: %v\n", metricsErr)
@@ -92,12 +114,18 @@ func newMonitorCmd(opts *GlobalOptions, defaultInterval time.Duration) *cobra.Co
 					_, _ = fmt.Fprintf(out, "WARN: metrics parse failed: %v\n", parseErr)
 				}
 
-				_, _ = fmt.Fprintln(out, "NAME\tSTATE\tCPU\tMEM\tRX\tTX")
+				headers := []string{"NAME", "STATE", "CPU", "MEM", "RX", "TX"}
+				var rows [][]string
 
 				var totalCPU float64
 				var totalMem float64
 				var totalRx float64
 				var totalTx float64
+
+				if len(sandboxes) == 0 {
+					_, _ = fmt.Fprintln(out, "(no running or frozen sandboxes; use --all to include stopped)")
+					_, _ = fmt.Fprintln(out)
+				}
 
 				for _, sb := range sandboxes {
 					r, ok := rates[sb.Name]
@@ -123,13 +151,27 @@ func newMonitorCmd(opts *GlobalOptions, defaultInterval time.Duration) *cobra.Co
 						}
 					}
 
-					_, _ = fmt.Fprintf(out, "%s\t%s\t%s\t%s\t%s\t%s\n", sb.Name, sb.Status, cpuStr, memStr, rxStr, txStr)
+					status := sb.Status
+					if tty {
+						status = colorizeStatus(status)
+					}
+					rows = append(rows, []string{sb.Name, status, cpuStr, memStr, rxStr, txStr})
 				}
 
+				// TOTAL row.
 				totalCPUPct := percent(totalCPU, float64(hostCPUs))
 				totalMemPct := percent(totalMem, float64(hostMemTotal))
-				_, _ = fmt.Fprintf(out, "\nTOTAL\t-\t%.2fc (%.1f%%)\t%s (%.1f%%)\t%s/s\t%s/s\n",
-					totalCPU, totalCPUPct, humanBytes(totalMem), totalMemPct, humanBytes(totalRx), humanBytes(totalTx))
+				totalRow := []string{
+					"TOTAL", "-",
+					fmt.Sprintf("%.2fc (%.1f%%)", totalCPU, totalCPUPct),
+					fmt.Sprintf("%s (%.1f%%)", humanBytes(totalMem), totalMemPct),
+					fmt.Sprintf("%s/s", humanBytes(totalRx)),
+					fmt.Sprintf("%s/s", humanBytes(totalTx)),
+				}
+				rows = append(rows, totalRow)
+
+				renderTable(out, headers, rows)
+				_, _ = fmt.Fprintln(out)
 
 				if metricsErr == nil && parseErr == nil {
 					prevSnap = snap
@@ -147,6 +189,7 @@ func newMonitorCmd(opts *GlobalOptions, defaultInterval time.Duration) *cobra.Co
 	}
 
 	cmd.Flags().DurationVar(&interval, "interval", defaultInterval, "Polling interval")
+	cmd.Flags().BoolVar(&showAll, "all", false, "Include stopped/other-state sandboxes")
 
 	return cmd
 }
@@ -209,4 +252,97 @@ func readHostMemInfo() (totalBytes uint64, availBytes uint64, _ error) {
 	}
 
 	return totalKB * 1024, availKB * 1024, nil
+}
+
+type monitorEntryJSON struct {
+	Name     string  `json:"name"`
+	Status   string  `json:"status"`
+	CPUCores float64 `json:"cpu_cores"`
+	MemBytes float64 `json:"mem_bytes"`
+	MemPct   float64 `json:"mem_pct"`
+	RxBps    float64 `json:"rx_bps"`
+	TxBps    float64 `json:"tx_bps"`
+}
+
+func monitorJSONSnapshot(ctx context.Context, s incusclient.InstanceServer, opts *GlobalOptions, out io.Writer, hostCPUs int, hostMemTotal uint64, showAll bool) error {
+	sandboxes, err := incus.ListSandboxes(s, true)
+	if err != nil {
+		return err
+	}
+	sortSandboxesForMonitor(sandboxes)
+	sandboxes = filterSandboxesForMonitor(sandboxes, showAll)
+
+	rates := map[string]monitor.InstanceRates{}
+	metricsText, metricsErr := s.GetMetrics()
+	if metricsErr == nil {
+		snap, parseErr := monitor.ParseIncusMetrics(metricsText, monitor.ParseOptions{Project: opts.IncusProject})
+		if parseErr == nil {
+			// Single snapshot: rates need two samples, so CPU/net rates are 0.
+			// Memory is available from a single sample.
+			for name, inst := range snap.Instances {
+				rates[name] = monitor.InstanceRates{
+					HasMemory: true,
+					MemBytes:  inst.MemBytes,
+				}
+			}
+			_ = snap
+		}
+	}
+
+	entries := make([]monitorEntryJSON, 0, len(sandboxes))
+	for _, sb := range sandboxes {
+		e := monitorEntryJSON{
+			Name:   sb.Name,
+			Status: sb.Status,
+		}
+		if r, ok := rates[sb.Name]; ok {
+			e.CPUCores = r.CPUCores
+			e.MemBytes = r.MemBytes
+			e.MemPct = percent(r.MemBytes, float64(hostMemTotal))
+			e.RxBps = r.RxBps
+			e.TxBps = r.TxBps
+		}
+		entries = append(entries, e)
+	}
+
+	return writeJSON(out, entries)
+}
+
+func filterSandboxesForMonitor(sandboxes []incus.Sandbox, showAll bool) []incus.Sandbox {
+	if showAll {
+		return sandboxes
+	}
+
+	out := make([]incus.Sandbox, 0, len(sandboxes))
+	for _, sb := range sandboxes {
+		switch monitorStateRank(sb.Status) {
+		case 0, 1: // running, frozen
+			out = append(out, sb)
+		}
+	}
+	return out
+}
+
+func sortSandboxesForMonitor(sandboxes []incus.Sandbox) {
+	sort.Slice(sandboxes, func(i, j int) bool {
+		ir := monitorStateRank(sandboxes[i].Status)
+		jr := monitorStateRank(sandboxes[j].Status)
+		if ir != jr {
+			return ir < jr
+		}
+		return strings.ToLower(sandboxes[i].Name) < strings.ToLower(sandboxes[j].Name)
+	})
+}
+
+func monitorStateRank(status string) int {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running":
+		return 0
+	case "frozen":
+		return 1
+	case "stopped":
+		return 2
+	default:
+		return 3
+	}
 }

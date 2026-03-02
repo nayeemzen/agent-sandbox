@@ -59,8 +59,11 @@ func newLsCmd(opts *GlobalOptions) *cobra.Command {
 				return nil
 			}
 
-			// Simple stable output (v1): NAME STATE AGE IPS TEMPLATE
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "NAME\tSTATE\tAGE\tIPS\tTEMPLATE")
+			out := cmd.OutOrStdout()
+			tty := isTTY(out)
+
+			headers := []string{"NAME", "STATE", "AGE", "IPS", "TEMPLATE"}
+			rows := make([][]string, 0, len(sandboxes))
 			now := time.Now()
 			for _, sb := range sandboxes {
 				age := ""
@@ -78,9 +81,15 @@ func newLsCmd(opts *GlobalOptions) *cobra.Command {
 					tpl = "-"
 				}
 
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\t%s\t%s\n", sb.Name, sb.Status, age, ips, tpl)
+				status := sb.Status
+				if tty {
+					status = colorizeStatus(status)
+				}
+
+				rows = append(rows, []string{sb.Name, status, age, ips, tpl})
 			}
 
+			renderTable(out, headers, rows)
 			return nil
 		},
 	}

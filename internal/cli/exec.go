@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	incusclient "github.com/lxc/incus/v6/client"
+	"golang.org/x/term"
 
 	"github.com/nayeemzen/agent-sandbox/internal/incus"
 	"github.com/nayeemzen/agent-sandbox/internal/state"
@@ -27,7 +28,7 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "exec <sandbox> [-- <command...>]",
 		Short:         "Run a command inside a sandbox (foreground or detached)",
-		Args:          cobra.MinimumNArgs(1),
+		Args:          cobra.ArbitraryArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true, // exec needs to return the guest exit code without Cobra printing "Error: ..."
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -38,16 +39,32 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 			ctx, stop := signal.NotifyContext(baseCtx, os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
-			sandboxName, guestCmd, err := parseExecArgs(cmd, args)
+			s, err := connectIncus(ctx, opts)
 			if err != nil {
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
 				return ExitCodeError{Code: 1}
 			}
 
-			s, err := connectIncus(ctx, opts)
-			if err != nil {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
-				return ExitCodeError{Code: 1}
+			var sandboxName string
+			var guestCmd []string
+			if len(args) == 0 {
+				sandboxes, err := incus.ListSandboxes(s, false)
+				if err != nil {
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					return ExitCodeError{Code: 1}
+				}
+
+				sandboxName, err = pickRequiredArg("sandbox", "Select sandbox for exec", sandboxOptionsFromIncus(sandboxes))
+				if err != nil {
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					return ExitCodeError{Code: 1}
+				}
+			} else {
+				sandboxName, guestCmd, err = parseExecArgs(cmd, args)
+				if err != nil {
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+					return ExitCodeError{Code: 1}
+				}
 			}
 
 			sb, err := incus.GetSandbox(s, sandboxName)
@@ -127,6 +144,19 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 			if len(execCmd) == 0 {
 				execCmd = []string{"sh"}
 				execOpts.Interactive = true
+
+				// Interactive exec needs raw terminal mode to avoid
+				// terminal control sequences leaking into shell input.
+				if stdinFile, ok := cmd.InOrStdin().(*os.File); ok && term.IsTerminal(int(stdinFile.Fd())) {
+					oldState, err := term.MakeRaw(int(stdinFile.Fd()))
+					if err != nil {
+						_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Error: failed to enter raw terminal mode:", err)
+						return ExitCodeError{Code: 1}
+					}
+					defer func() {
+						_ = term.Restore(int(stdinFile.Fd()), oldState)
+					}()
+				}
 			}
 
 			res, err := incus.Exec(ctx, s, sandboxName, execCmd, execOpts)

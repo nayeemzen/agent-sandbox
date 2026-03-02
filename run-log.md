@@ -22,3 +22,23 @@
 - 2026-03-02 03:35 note: Added hermetic unit tests for config/state load-save behavior and centralized Incus “not found” error normalization with unit tests.
 - 2026-03-02 03:40 decision: Added GitHub Actions CI with unit tests on every push/PR and an Incus-backed integration test suite gated by build tag `integration`.
 - 2026-03-02 03:44 decision: Standardized `--json` output for key commands (`ls`, `template`, `doctor`) using explicit JSON structs/tags and added a `completion` command for shell completions.
+- 2026-03-02 09:39 decision: Added interactive argument pickers (arrow + enter) for missing required system-derived args (sandbox/template/proc) across `ps`, `logs`, `kill`, lifecycle commands, `exec`, and `template default/rm`.
+- 2026-03-02 09:39 evidence: Verified `sandbox ps` and `sandbox exec` open a selector when sandbox arg is omitted and proceed after Enter selection.
+- 2026-03-02 10:19 decision: Changed `sandbox ps` default behavior to list managed processes across all sandboxes; `sandbox ps <name>` now acts as a sandbox filter.
+- 2026-03-02 10:19 fix: Removed the `sandbox ps` mandatory picker path to avoid selecting stale sandbox names and instead render one aggregated process table with a `SANDBOX` column.
+- 2026-03-02 10:19 decision: Monitor output ordering now sorts by state priority (`Running` -> `Frozen` -> `Stopped` -> others), then alphabetically by sandbox name.
+- 2026-03-02 10:21 decision: `sandbox monitor` now defaults to active instances only (`Running` + `Frozen`); `--all` includes stopped/other states.
+- 2026-03-02 10:21 evidence: Verified `sandbox monitor --json` excludes stopped instances and `sandbox monitor --all --json` includes them.
+- 2026-03-02 10:24 fix: Updated `sandbox logs` argument resolution to select sandboxes from live Incus state (running managed containers), not only from managed-proc state.
+- 2026-03-02 10:24 decision: Added fallback log discovery for `sandbox logs` when no proc metadata exists by enumerating `/var/log/sandbox/*.log` in-guest and prompting for selection.
+- 2026-03-02 10:54 decision: Added a new `sandbox install` command (Go implementation) as an interactive onboarding checklist that performs local host bootstrap with step-by-step status updates.
+- 2026-03-02 10:54 decision: `sandbox install` runs privileged host operations through `sudo` and keeps password prompts interactive by attaching stdin/stdout/stderr directly.
+- 2026-03-02 10:54 note: When `incus-admin` group membership is added during install, follow-up `doctor/init` steps are executed through `sg incus-admin` when available so setup can finish in the same run.
+- 2026-03-02 10:54 evidence: Verified `sandbox install --help` exposes onboarding flags (`--yes`, `--with-skopeo`, `--no-init`, `--source`) after rebuild.
+- 2026-03-02 10:58 fix: Removed the upfront confirmation prompt and the standalone sudo-auth checklist step from `sandbox install`; sudo password prompts now occur naturally when each privileged command executes.
+- 2026-03-02 10:58 decision: Removed optional install flags for skopeo/init and switched those choices to interactive prompts inside the installer flow; only `--yes` remains for non-interactive defaults.
+- 2026-03-02 11:07 failure: `sandbox install` failed on Linux Mint/Ubuntu because it expected `incusd` on PATH even though daemon functionality was provided via systemd units (`incus.service`/`incus.socket`).
+- 2026-03-02 11:07 fix: Updated Incus install detection to accept either `incusd` on PATH or presence of Incus systemd units, preventing false-negative install failures.
+- 2026-03-02 11:07 decision: Added an idempotent PATH step in `sandbox install` that checks current PATH/profile and offers to persist the sandbox binary directory in shell config when missing.
+- 2026-03-02 11:07 fix: Reduced noisy install output by probing Incus init and UFW status through compact shell checks instead of printing full JSON/status dumps.
+- 2026-03-02 11:11 fix: Moved default-template readiness detection before the optional init prompt so installer auto-marks the template step complete without asking when already ready.

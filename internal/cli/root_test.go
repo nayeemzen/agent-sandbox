@@ -19,6 +19,7 @@ func TestRootHelpIncludesPlannedCommands(t *testing.T) {
 
 	out := buf.String()
 	wantSubstrings := []string{
+		"install",
 		"setup",
 		"doctor",
 		"init",

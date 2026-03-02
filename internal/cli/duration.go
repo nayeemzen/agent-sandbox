@@ -50,5 +50,5 @@ func formatNewDuration(d time.Duration, tty bool) (emoji string, duration string
 }
 
 func ansiBoldGreen(s string) string {
-	return "\033[1;32m" + s + "\033[0m"
+	return boldGreen.Render(s)
 }

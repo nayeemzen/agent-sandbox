@@ -51,6 +51,17 @@ Notes:
 
 - Go `>= 1.25` is required (due to the Incus Go client dependency).
 
+Fresh machine bootstrap (interactive checklist, sudo prompts included):
+
+```bash
+sandbox install
+```
+
+The installer asks about optional items (like installing `skopeo` and running `sandbox init`) interactively.
+Use `sandbox install --yes` for non-interactive defaults.
+It is idempotent: each checklist step detects “already done” state and skips/reports accordingly.
+It also offers to persist the sandbox binary directory into your shell PATH when needed.
+
 ## Quickstart
 
 1. Confirm environment readiness:
@@ -159,14 +170,18 @@ sandbox exec mybox --detach --name web -- sh -lc 'python3 -m http.server 8000'
 List managed processes:
 
 ```bash
-sandbox ps mybox
+sandbox ps          # all sandboxes
+sandbox ps mybox    # one sandbox
 ```
 
 Tail logs:
 
 ```bash
+sandbox logs              # pick sandbox/proc interactively
 sandbox logs mybox --proc web
 ```
+
+If no managed proc metadata exists for a sandbox, `sandbox logs` falls back to log files under `/var/log/sandbox/*.log`.
 
 Stop the process:
 
@@ -181,7 +196,10 @@ Live monitoring (polling Incus metrics, refreshes display):
 ```bash
 sandbox monitor
 sandbox monitor --interval 5s
+sandbox monitor --all
 ```
+
+By default, `sandbox monitor` shows `Running` and `Frozen` sandboxes only. Use `--all` to include stopped/other states.
 
 Metrics are derived from Incus Prometheus text metrics:
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/nayeemzen/agent-sandbox/internal/incus"
 	"github.com/spf13/cobra"
 )
@@ -136,13 +137,23 @@ func newTemplateLsCmd(opts *GlobalOptions) *cobra.Command {
 				return nil
 			}
 
-			// Simple stable output (v1): NAME DEFAULT SOURCE AGE FINGERPRINT
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "NAME\tDEFAULT\tSOURCE\tAGE\tFINGERPRINT")
+			out := cmd.OutOrStdout()
+			tty := isTTY(out)
+
+			headers := []string{"NAME", "DEFAULT", "SOURCE", "AGE", "FINGERPRINT"}
+			rows := make([][]string, 0, len(templates))
 			now := time.Now()
 			for _, t := range templates {
 				isDefault := "no"
 				if cfg.DefaultTemplate == t.Name {
 					isDefault = "yes"
+				}
+				if tty {
+					if isDefault == "yes" {
+						isDefault = lipgloss.NewStyle().Foreground(colorGreen).Render("yes")
+					} else {
+						isDefault = lipgloss.NewStyle().Foreground(colorGray).Render("no")
+					}
 				}
 
 				age := ""
@@ -155,9 +166,10 @@ func newTemplateLsCmd(opts *GlobalOptions) *cobra.Command {
 					src = "-"
 				}
 
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\t%s\t%s\n", t.Name, isDefault, src, age, shortFingerprint(t.Fingerprint))
+				rows = append(rows, []string{t.Name, isDefault, src, age, shortFingerprint(t.Fingerprint)})
 			}
 
+			renderTable(out, headers, rows)
 			return nil
 		},
 	}
@@ -224,12 +236,23 @@ func newTemplateRmCmd(opts *GlobalOptions) *cobra.Command {
 					return err
 				}
 
+				if opts.JSON {
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"all": true, "removed": true})
+				}
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "all templates removed")
 				return nil
 			}
 
 			if len(args) != 1 {
-				return fmt.Errorf("template name required (or use --all)")
+				templates, err := incus.ListTemplates(s)
+				if err != nil {
+					return err
+				}
+				name, err := pickRequiredArg("template", "Select template to remove", templateOptionsFromList(templates))
+				if err != nil {
+					return err
+				}
+				args = []string{name}
 			}
 
 			name := args[0]
@@ -244,6 +267,9 @@ func newTemplateRmCmd(opts *GlobalOptions) *cobra.Command {
 				}
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "removed": true})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "template %s removed\n", name)
 			return nil
 		},
@@ -260,7 +286,7 @@ func newTemplateDefaultCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "default <name>",
 		Short:         "Set the default template used by sandbox new",
-		Args:          cobra.ExactArgs(1),
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -268,8 +294,6 @@ func newTemplateDefaultCmd(opts *GlobalOptions) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-
-			name := args[0]
 
 			cfg, cfgPath, err := loadConfig(opts)
 			if err != nil {
@@ -279,6 +303,19 @@ func newTemplateDefaultCmd(opts *GlobalOptions) *cobra.Command {
 			s, err := connectIncus(ctx, opts)
 			if err != nil {
 				return err
+			}
+			var name string
+			if len(args) == 1 {
+				name = args[0]
+			} else {
+				templates, err := incus.ListTemplates(s)
+				if err != nil {
+					return err
+				}
+				name, err = pickRequiredArg("template", "Select default template", templateOptionsFromList(templates))
+				if err != nil {
+					return err
+				}
 			}
 
 			if exists, err := incus.TemplateExists(s, name); err != nil {
@@ -292,6 +329,9 @@ func newTemplateDefaultCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
+			if opts.JSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "default": true})
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "default template set to %s\n", name)
 			return nil
 		},
