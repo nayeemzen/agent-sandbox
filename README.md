@@ -28,7 +28,8 @@ Agents execute untrusted code. They install packages, run builds, hit APIs, and 
 Existing options have tradeoffs:
 
 - **Docker** is built for app packaging, not interactive sandboxes. No init system, awkward exec model, hard to get a "real machine" feel.
-- **VMs** (Firecracker, QEMU) are strong isolation but slow to boot and heavy on resources.
+- **MicroVMs** (Firecracker) boot fast but require kernel images, rootfs management, and custom orchestration. Higher resource overhead per instance than containers.
+- **Traditional VMs** (QEMU/KVM) are strong isolation but slow to boot and heavy on resources.
 - **Namespaces/seccomp wrappers** (bubblewrap, nsjail) are low-level and require significant glue code.
 
 agent-sandbox uses **Incus system containers** -- full Linux systems with init, networking, and cgroups -- managed through a purpose-built CLI that optimizes for the agent workflow: create fast, exec commands, run background processes, tail logs, monitor resources, tear down.
