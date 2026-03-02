@@ -2,7 +2,7 @@ tasks:
   - id: TASK-001
     description: Write an Incus-first PLAN.md for the agent-sandbox repo and sandbox CLI, defining concepts (template/sandbox/process) and mapping each CLI command to Incus primitives/operations.
     status: complete
-    git_commit_sha: ""
+    git_commit_sha: "16be6f0eed60b03780ec21222a70829381fbb3ef"
     failure_reason: ""
     acceptance_criteria:
       - PLAN.md exists and is readable by an engineer with no prior context.
@@ -13,8 +13,8 @@ tasks:
 
   - id: TASK-002
     description: Initialize git locally and create the GitHub repo named agent-sandbox; configure origin and verify non-interactive pushes.
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "16be6f0eed60b03780ec21222a70829381fbb3ef"
     failure_reason: ""
     acceptance_criteria:
       - This directory is a git repo with a clean default branch (main).
