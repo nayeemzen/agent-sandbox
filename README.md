@@ -39,7 +39,7 @@ agent-sandbox uses **Incus system containers** -- full Linux systems with init, 
 Template (immutable image)          Sandbox (mutable container)
 ┌─────────────────────┐             ┌─────────────────────┐
 │  base OS snapshot   │──creates──▶ │  running instance   │
-│  + /var/log/sandbox │   < 3s     │  + own filesystem   │
+│  + /var/log/sandbox │   < 3s      │  + own filesystem   │
 │  + /run/sandbox     │             │  + own network (IP) │
 │                     │             │  + own process tree │
 └─────────────────────┘             └─────────────────────┘
