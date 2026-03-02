@@ -73,8 +73,8 @@ tasks:
 
   - id: TASK-007
     description: Phase 3 - Sandboxes (new/ls/pause/resume/stop/start/delete + template resolution + timing output).
-    status: not_started
-    git_commit_sha: ""
+    status: complete
+    git_commit_sha: "980a1a1698db5875e4d0b9b88c3f9d656de9dfc0"
     failure_reason: ""
     acceptance_criteria:
       - sandbox new creates an instance from an existing template and is shell-ready quickly.
@@ -82,7 +82,7 @@ tasks:
       - sandbox ls shows name/state/age/IP(s)/template for CLI-managed instances.
       - Lifecycle commands work predictably and update local state.
       - Unit tests cover duration classification (<3s, 3-10s, >10s) and JSON vs TTY formatting behavior.
-    implementation_notes: Ensure /var/log/sandbox exists in guests created by sandbox new.
+    implementation_notes: Implemented Incus-backed `sandbox new`, `ls`, and lifecycle commands with managed-instance labels; added unit tests for duration classification and TTY/JSON formatting behavior.
 
   - id: TASK-008
     description: Phase 4 - Exec + managed processes + logs (exec foreground, exec --detach, logs, ps, kill).
