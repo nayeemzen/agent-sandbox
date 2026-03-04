@@ -174,6 +174,9 @@ sandbox new dev
 
 # Specify a template explicitly
 sandbox new dev --template alpine
+
+# Create and publish ports in one step
+sandbox new dev -p 8080:80 -p :8000
 ```
 
 ### Listing sandboxes
