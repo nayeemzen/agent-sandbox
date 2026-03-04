@@ -68,7 +68,7 @@ func connectIncus(ctx context.Context, opts *GlobalOptions) (incusclient.Instanc
 		InsecureSkipVerify: opts.IncusInsecure,
 	})
 	if err != nil {
-		return nil, err
+		return nil, decorateIncusConnectError(err, opts)
 	}
 
 	if opts.IncusProject != "" && opts.IncusProject != "default" {
