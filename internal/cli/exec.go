@@ -144,8 +144,9 @@ func newExecCmd(opts *GlobalOptions) *cobra.Command {
 
 			// With no command, open an interactive shell.
 			if len(execCmd) == 0 {
-				execCmd = []string{"sh"}
+				execCmd = defaultInteractiveShellCommand()
 				execOpts.Interactive = true
+				execOpts.Environment = interactiveExecEnvironment()
 
 				// Interactive exec needs raw terminal mode to avoid
 				// terminal control sequences leaking into shell input.

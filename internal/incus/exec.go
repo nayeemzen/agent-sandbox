@@ -15,6 +15,7 @@ type ExecOptions struct {
 	Stdin       io.Reader
 	Stdout      io.Writer
 	Stderr      io.Writer
+	Environment map[string]string
 }
 
 type ExecResult struct {
@@ -29,6 +30,7 @@ func Exec(ctx context.Context, s incusclient.InstanceServer, instance string, co
 		WaitForWS:    true,
 		Interactive:  opts.Interactive,
 		RecordOutput: false,
+		Environment:  opts.Environment,
 	}
 
 	execArgs := &incusclient.InstanceExecArgs{
