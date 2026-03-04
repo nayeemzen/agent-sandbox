@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	incusclient "github.com/lxc/incus/v6/client"
 	"github.com/spf13/cobra"
 
 	"github.com/nayeemzen/agent-sandbox/internal/incus"
@@ -16,6 +17,7 @@ import (
 
 func newNewCmd(opts *GlobalOptions) *cobra.Command {
 	var template string
+	var publishPorts []string
 
 	cmd := &cobra.Command{
 		Use:   "new <name>",
@@ -107,7 +109,7 @@ func newNewCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if opts.JSON {
-				return writeJSON(cmd.OutOrStdout(), sandboxNewJSON{
+				out := sandboxNewJSON{
 					Name:       sb.Name,
 					Template:   chosen,
 					Status:     sb.Status,
@@ -115,39 +117,78 @@ func newNewCmd(opts *GlobalOptions) *cobra.Command {
 					IPv6:       sb.IPv6,
 					CreatedAt:  sb.CreatedAt,
 					DurationMS: dur.Milliseconds(),
-				})
+				}
+				if len(publishPorts) > 0 {
+					out.PublishedPorts = []publishPortJSON{}
+					for _, spec := range publishPorts {
+						mapping, err := parsePortSpec(spec)
+						if err != nil {
+							return err
+						}
+						pp, created, err := publishOrRetry(ctx, s, name, mapping, "0.0.0.0", "127.0.0.1", "tcp")
+						if err != nil {
+							return fmt.Errorf("sandbox %q created but port publish failed: %w", name, err)
+						}
+						out.PublishedPorts = append(out.PublishedPorts, publishPortJSON{
+							Sandbox:        name,
+							Device:         pp.Device,
+							Protocol:       pp.Protocol,
+							ListenAddress:  pp.ListenAddress,
+							HostPort:       pp.HostPort,
+							ConnectAddress: pp.ConnectAddress,
+							GuestPort:      pp.GuestPort,
+							Created:        created,
+						})
+					}
+				}
+				return writeJSON(cmd.OutOrStdout(), out)
 			}
 
 			tty := isTTY(cmd.OutOrStdout())
 			emoji, durStr := formatNewDuration(dur, tty)
-
-			ips := "-"
-			if len(sb.IPv4)+len(sb.IPv6) > 0 {
-				ips = strings.Join(append(append([]string{}, sb.IPv4...), sb.IPv6...), ",")
-			}
 
 			prefix := ""
 			if tty && emoji != "" {
 				prefix = emoji + " "
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%s created in %s (state=%s template=%s ips=%s)\n", prefix, sb.Name, durStr, sb.Status, chosen, ips)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%s created in %s (state=%s template=%s)\n", prefix, sb.Name, durStr, sb.Status, chosen)
+
+			if len(publishPorts) > 0 {
+				for _, spec := range publishPorts {
+					mapping, err := parsePortSpec(spec)
+					if err != nil {
+						return err
+					}
+					pp, created, err := publishOrRetry(ctx, s, name, mapping, "0.0.0.0", "127.0.0.1", "tcp")
+					if err != nil {
+						return fmt.Errorf("sandbox %q created but port publish failed: %w", name, err)
+					}
+					action := "published"
+					if !created {
+						action = "already published"
+					}
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s %s:%s:%d -> %s:%d (device=%s)\n", action, pp.Protocol, pp.ListenAddress, pp.HostPort, pp.ConnectAddress, pp.GuestPort, pp.Device)
+				}
+			}
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&template, "template", "", "Template name to use")
+	cmd.Flags().StringArrayVarP(&publishPorts, "publish", "p", nil, "Publish ports on the host (examples: 8080:80, 8000, :8000)")
 	return cmd
 }
 
 type sandboxNewJSON struct {
-	Name       string    `json:"name"`
-	Template   string    `json:"template"`
-	Status     string    `json:"status"`
-	IPv4       []string  `json:"ipv4"`
-	IPv6       []string  `json:"ipv6"`
-	CreatedAt  time.Time `json:"created_at"`
-	DurationMS int64     `json:"duration_ms"`
+	Name           string            `json:"name"`
+	Template       string            `json:"template"`
+	Status         string            `json:"status"`
+	IPv4           []string          `json:"ipv4"`
+	IPv6           []string          `json:"ipv6"`
+	CreatedAt      time.Time         `json:"created_at"`
+	DurationMS     int64             `json:"duration_ms"`
+	PublishedPorts []publishPortJSON `json:"published_ports,omitempty"`
 }
 
 func nonZeroTime(v time.Time, fallback time.Time) time.Time {
@@ -199,4 +240,14 @@ func decorateNewSandboxCreateError(err error, name string) error {
 		fmt.Sprintf("sandbox %q already exists (state=%s)", displayName, status),
 		fmt.Sprintf("Reuse it with `%s`, or replace it with `sandbox delete %s --yes` then `sandbox new %s`.", primary, displayName, displayName),
 	)
+}
+
+func publishOrRetry(ctx context.Context, s incusclient.InstanceServer, sandbox string, mapping portSpec, listenAddr string, connectAddr string, proto string) (incus.PublishedPort, bool, error) {
+	var pp incus.PublishedPort
+	var created bool
+	err := publishWithRetries(ctx, s, sandbox, listenAddr, connectAddr, proto, mapping.HostPort, mapping.GuestPort, mapping.RandomHostPort, func(p incus.PublishedPort, c bool) {
+		pp = p
+		created = c
+	})
+	return pp, created, err
 }

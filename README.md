@@ -6,13 +6,19 @@ Create a **template** once (slow), then spin up sandboxes from it in **under a s
 
 ```
 $ sandbox new dev
-⚡️ dev created in 0.68s (state=Running template=default ips=10.75.219.42)
+⚡️ dev created in 0.68s (state=Running template=default)
 
 $ sandbox exec dev -- uname -a
 Linux dev 6.14.0-37-generic #37-Ubuntu SMP x86_64 GNU/Linux
 
 $ sandbox exec dev --detach --name web -- python3 -m http.server 8000
 started managed process "web" in sandbox "dev"
+
+$ sandbox publish dev 8000
+published tcp:0.0.0.0:8000 -> 127.0.0.1:8000 (device=sandbox-port-tcp-8000-8000)
+
+$ curl http://127.0.0.1:8000
+...
 
 $ sandbox monitor
 SANDBOX        CPU (cores)  MEM (MiB)  NET RX/s   NET TX/s   STATE
@@ -292,21 +298,42 @@ sandbox completion fish > ~/.config/fish/completions/sandbox.fish
 
 ## Networking
 
-v1 uses **subnet routing** rather than per-port publishing. Each sandbox gets a private IP from the Incus bridge (typically `incusbr0`).
+v1 uses **port publishing** (Docker-style `-p`) rather than subnet routing. This makes sandbox services reachable on the host (and on your tailnet via the host) without needing to route the Incus bridge subnet.
 
-To make sandboxes reachable from other machines on your network:
-
-1. **Tailscale subnet routing** (recommended): advertise the Incus bridge subnet from the host, then any tailnet device can reach `<sandbox-ip>:<port>` directly, governed by Tailscale ACLs.
-
-2. **Host-level routing**: configure your network to route the bridge subnet through the Incus host.
+### Publish a port
 
 ```bash
-# Example: find a sandbox's IP
-sandbox ls --json | jq -r '.[0].ipv4[0]'
+# Publish host port 8080 -> sandbox port 80
+sandbox publish mybox 8080:80
 
-# Access a service running in the sandbox
-curl http://10.75.219.42:8000
+# Publish a random host port -> sandbox port 8000
+sandbox publish mybox :8000
+
+# List published ports
+sandbox ports mybox
+
+# Remove a published port
+sandbox unpublish mybox 8080
+sandbox unpublish mybox --all
 ```
+
+`sandbox publish` defaults to connecting to `127.0.0.1` inside the sandbox, so it works even if your app only binds to localhost.
+
+### Access from host and Tailscale
+
+Once published, the service is reachable on the Incus host:
+
+```bash
+curl http://127.0.0.1:8080
+```
+
+If the Incus host runs Tailscale, the published port is also reachable from other tailnet devices using the host's tailnet name/IP:
+
+```bash
+curl http://<incus-host>:8080
+```
+
+If a host firewall (for example UFW) is enabled, you'll need to allow inbound access to the published port (optionally only on `tailscale0`).
 
 ## Configuration
 

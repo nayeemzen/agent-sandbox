@@ -6,8 +6,10 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,6 +96,33 @@ func TestIncusEndToEnd_TemplateNewExecDetachLogsKill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("kill: %v", err)
 	}
+
+	// Start an HTTP server bound to localhost and publish it on a random host port.
+	token := "ok-" + suffix
+	_, err = runCmd(ctx, bin, []string{"--config", cfgPath, "--state", statePath, "exec", sandboxName, "--detach", "--name", "web", "--", "sh", "-lc", fmt.Sprintf("token=%s; while true; do printf \"HTTP/1.0 200 OK\\\\r\\\\n\\\\r\\\\n${token}\\\\n\" | nc -l -p 8000 -s 127.0.0.1 -w 1; done", token)})
+	if err != nil {
+		t.Fatalf("exec httpd: %v", err)
+	}
+
+	pubOut, err := runCmd(ctx, bin, []string{"--json", "--config", cfgPath, "--state", statePath, "publish", sandboxName, ":8000"})
+	if err != nil {
+		t.Fatalf("publish: %v (out=%q)", err, pubOut)
+	}
+	var pubs []struct {
+		HostPort int `json:"host_port"`
+	}
+	if err := json.Unmarshal([]byte(pubOut), &pubs); err != nil {
+		t.Fatalf("publish json parse: %v (out=%q)", err, pubOut)
+	}
+	if len(pubs) != 1 || pubs[0].HostPort == 0 {
+		t.Fatalf("publish json missing host_port: %q", pubOut)
+	}
+
+	if err := waitHTTPContains(ctx, pubs[0].HostPort, token); err != nil {
+		t.Fatalf("host http get: %v", err)
+	}
+
+	_, _ = runCmd(ctx, bin, []string{"--config", cfgPath, "--state", statePath, "kill", sandboxName, "web", "--force"})
 }
 
 func buildSandboxBinary(t *testing.T) string {
@@ -221,6 +250,33 @@ func runLogsUntil(ctx context.Context, bin string, args []string, wantSubstring 
 				return fmt.Errorf("logs exited before emitting %q", wantSubstring)
 			}
 			return err
+		}
+	}
+}
+
+func waitHTTPContains(ctx context.Context, port int, want string) error {
+	deadline := time.NewTimer(30 * time.Second)
+	defer deadline.Stop()
+
+	url := fmt.Sprintf("http://127.0.0.1:%d/", port)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("timed out waiting for %s to contain %q", url, want)
+		default:
+			resp, err := http.Get(url)
+			if err != nil {
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
+			b, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if strings.Contains(string(b), want) {
+				return nil
+			}
+			time.Sleep(200 * time.Millisecond)
 		}
 	}
 }
