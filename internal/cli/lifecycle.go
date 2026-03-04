@@ -53,7 +53,11 @@ func newPauseCmd(opts *GlobalOptions) *cobra.Command {
 				return nil
 			}
 
-			if err := incus.PauseSandbox(ctx, s, name); err != nil {
+			errOut := cmd.ErrOrStderr()
+			showProgress := !opts.JSON && isTTY(errOut)
+			if err := withProgress(errOut, showProgress, fmt.Sprintf("Pausing sandbox %q", name), func() error {
+				return incus.PauseSandbox(ctx, s, name)
+			}); err != nil {
 				return err
 			}
 
@@ -116,7 +120,11 @@ func newResumeCmd(opts *GlobalOptions) *cobra.Command {
 				return nil
 			}
 
-			if err := incus.ResumeSandbox(ctx, s, name); err != nil {
+			errOut := cmd.ErrOrStderr()
+			showProgress := !opts.JSON && isTTY(errOut)
+			if err := withProgress(errOut, showProgress, fmt.Sprintf("Resuming sandbox %q", name), func() error {
+				return incus.ResumeSandbox(ctx, s, name)
+			}); err != nil {
 				return err
 			}
 
@@ -189,7 +197,15 @@ func newStopCmd(opts *GlobalOptions) *cobra.Command {
 				return newCLIError("stop timeout must be > 0", "Example: sandbox stop <name> --timeout 45s")
 			}
 
-			if err := incus.StopSandbox(ctx, s, name, force, timeout); err != nil {
+			errOut := cmd.ErrOrStderr()
+			showProgress := !opts.JSON && isTTY(errOut)
+			stopVerb := "Stopping sandbox"
+			if force {
+				stopVerb = "Force stopping sandbox"
+			}
+			if err := withProgress(errOut, showProgress, fmt.Sprintf("%s %q", stopVerb, name), func() error {
+				return incus.StopSandbox(ctx, s, name, force, timeout)
+			}); err != nil {
 				// In some cases graceful shutdown times out but the instance stops shortly after.
 				// Re-check state before returning an error.
 				if sbNow, getErr := incus.GetSandbox(s, name); getErr == nil && strings.EqualFold(sbNow.Status, "stopped") {
@@ -276,11 +292,19 @@ func newStartCmd(opts *GlobalOptions) *cobra.Command {
 
 			// UX simplification: start treats a paused sandbox like resume.
 			if strings.EqualFold(sb.Status, "frozen") {
-				if err := incus.ResumeSandbox(ctx, s, name); err != nil {
+				errOut := cmd.ErrOrStderr()
+				showProgress := !opts.JSON && isTTY(errOut)
+				if err := withProgress(errOut, showProgress, fmt.Sprintf("Resuming sandbox %q", name), func() error {
+					return incus.ResumeSandbox(ctx, s, name)
+				}); err != nil {
 					return err
 				}
 			} else {
-				if err := incus.StartSandbox(ctx, s, name); err != nil {
+				errOut := cmd.ErrOrStderr()
+				showProgress := !opts.JSON && isTTY(errOut)
+				if err := withProgress(errOut, showProgress, fmt.Sprintf("Starting sandbox %q", name), func() error {
+					return incus.StartSandbox(ctx, s, name)
+				}); err != nil {
 					return err
 				}
 			}
@@ -340,7 +364,15 @@ func newDeleteCmd(opts *GlobalOptions) *cobra.Command {
 				}
 			}
 
-			if err := incus.DeleteSandbox(ctx, s, name, force); err != nil {
+			errOut := cmd.ErrOrStderr()
+			showProgress := !opts.JSON && isTTY(errOut)
+			deleteVerb := "Deleting sandbox"
+			if force {
+				deleteVerb = "Force deleting sandbox"
+			}
+			if err := withProgress(errOut, showProgress, fmt.Sprintf("%s %q", deleteVerb, name), func() error {
+				return incus.DeleteSandbox(ctx, s, name, force)
+			}); err != nil {
 				return err
 			}
 

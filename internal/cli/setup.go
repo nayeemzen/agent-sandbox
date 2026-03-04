@@ -59,7 +59,7 @@ func newSetupCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if !noInit {
-				if err := runInit(ctx, opts, cmd.OutOrStdout(), "images:ubuntu/24.04"); err != nil {
+				if err := runInit(ctx, opts, cmd.OutOrStdout(), cmd.ErrOrStderr(), "images:ubuntu/24.04"); err != nil {
 					return err
 				}
 			} else {

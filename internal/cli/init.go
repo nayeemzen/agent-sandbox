@@ -27,7 +27,7 @@ func newInitCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			return runInit(ctx, opts, cmd.OutOrStdout(), source)
+			return runInit(ctx, opts, cmd.OutOrStdout(), cmd.ErrOrStderr(), source)
 		},
 	}
 
@@ -36,7 +36,7 @@ func newInitCmd(opts *GlobalOptions) *cobra.Command {
 	return cmd
 }
 
-func runInit(ctx context.Context, opts *GlobalOptions, out io.Writer, source string) error {
+func runInit(ctx context.Context, opts *GlobalOptions, out io.Writer, progressOut io.Writer, source string) error {
 	cfg, cfgPath, err := loadConfig(opts)
 	if err != nil {
 		return err
@@ -71,9 +71,21 @@ func runInit(ctx context.Context, opts *GlobalOptions, out io.Writer, source str
 			source = "images:ubuntu/24.04"
 		}
 
-		_, _ = fmt.Fprintf(out, "creating default template from %s...\n", source)
-		if _, err := incus.CreateTemplate(ctx, s, "default", source, incus.CreateTemplateOptions{ProvisionVersion: "v1"}); err != nil {
+		showProgress := !opts.JSON && isTTY(progressOut)
+		if !showProgress {
+			_, _ = fmt.Fprintf(out, "creating default template from %s...\n", source)
+		}
+
+		createErr := withProgress(progressOut, showProgress, fmt.Sprintf("Creating default template from %s", source), func() error {
+			_, err := incus.CreateTemplate(ctx, s, "default", source, incus.CreateTemplateOptions{ProvisionVersion: "v1"})
 			return err
+		})
+		if createErr != nil {
+			return createErr
+		}
+
+		if !showProgress {
+			_, _ = fmt.Fprintf(out, "created default template from %s\n", source)
 		}
 
 		cfg.DefaultTemplate = "default"

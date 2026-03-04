@@ -80,8 +80,16 @@ func newTemplateAddCmd(opts *GlobalOptions) *cobra.Command {
 				return err
 			}
 
-			tpl, err := incus.CreateTemplate(ctx, s, name, source, incus.CreateTemplateOptions{
-				ProvisionVersion: provisionVersion,
+			errOut := cmd.ErrOrStderr()
+			showProgress := !opts.JSON && isTTY(errOut)
+
+			var tpl incus.Template
+			err = withProgress(errOut, showProgress, fmt.Sprintf("Creating template %q from %s", name, source), func() error {
+				var createErr error
+				tpl, createErr = incus.CreateTemplate(ctx, s, name, source, incus.CreateTemplateOptions{
+					ProvisionVersion: provisionVersion,
+				})
+				return createErr
 			})
 			if err != nil {
 				return err
@@ -249,13 +257,22 @@ func newTemplateRmCmd(opts *GlobalOptions) *cobra.Command {
 					return err
 				}
 
-				for _, t := range templates {
-					if err := incus.DeleteTemplate(ctx, s, t.Name, force); err != nil {
-						return err
+				errOut := cmd.ErrOrStderr()
+				showProgress := !opts.JSON && isTTY(errOut)
+
+				err = withProgress(errOut, showProgress, fmt.Sprintf("Removing %d template(s)", len(templates)), func() error {
+					for _, t := range templates {
+						if err := incus.DeleteTemplate(ctx, s, t.Name, force); err != nil {
+							return err
+						}
+						if cfg.DefaultTemplate == t.Name {
+							cfg.DefaultTemplate = ""
+						}
 					}
-					if cfg.DefaultTemplate == t.Name {
-						cfg.DefaultTemplate = ""
-					}
+					return nil
+				})
+				if err != nil {
+					return err
 				}
 
 				if err := saveConfig(cfgPath, cfg); err != nil {
@@ -282,7 +299,11 @@ func newTemplateRmCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			name := args[0]
-			if err := incus.DeleteTemplate(ctx, s, name, force); err != nil {
+			errOut := cmd.ErrOrStderr()
+			showProgress := !opts.JSON && isTTY(errOut)
+			if err := withProgress(errOut, showProgress, fmt.Sprintf("Removing template %q", name), func() error {
+				return incus.DeleteTemplate(ctx, s, name, force)
+			}); err != nil {
 				return err
 			}
 

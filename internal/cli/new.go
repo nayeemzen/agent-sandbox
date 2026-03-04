@@ -18,8 +18,8 @@ func newNewCmd(opts *GlobalOptions) *cobra.Command {
 	var template string
 
 	cmd := &cobra.Command{
-		Use:           "new <name>",
-		Short:         "Create a sandbox quickly from an existing template (fast path)",
+		Use:   "new <name>",
+		Short: "Create a sandbox quickly from an existing template (fast path)",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return newCLIError("missing required argument: name", "Usage: sandbox new <name>")
@@ -78,7 +78,15 @@ func newNewCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			start := time.Now()
-			sb, err := incus.CreateSandbox(ctx, s, name, chosen)
+			errOut := cmd.ErrOrStderr()
+			showProgress := !opts.JSON && isTTY(errOut)
+
+			var sb incus.Sandbox
+			err = withProgress(errOut, showProgress, fmt.Sprintf("Creating sandbox %q from template %q", name, chosen), func() error {
+				var createErr error
+				sb, createErr = incus.CreateSandbox(ctx, s, name, chosen)
+				return createErr
+			})
 			dur := time.Since(start)
 			if err != nil {
 				return err
