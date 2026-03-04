@@ -251,6 +251,30 @@ func DeleteSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 	return op.WaitContext(ctx)
 }
 
+func RenameSandbox(ctx context.Context, s incusclient.InstanceServer, from string, to string) error {
+	from = strings.TrimSpace(from)
+	to = strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return fmt.Errorf("both source and target sandbox names are required")
+	}
+	if from == to {
+		return nil
+	}
+
+	op, err := s.RenameInstance(from, api.InstancePost{
+		Name: to,
+	})
+	if err != nil {
+		if IsAlreadyExists(err) {
+			if inst, _, getErr := s.GetInstance(to); getErr == nil {
+				return sandboxExistsErrorFromInstance(inst)
+			}
+		}
+		return err
+	}
+	return op.WaitContext(ctx)
+}
+
 func updateState(ctx context.Context, s incusclient.InstanceServer, name string, st api.InstanceStatePut) error {
 	_, etag, err := s.GetInstanceState(name)
 	if err != nil {

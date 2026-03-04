@@ -19,12 +19,20 @@ type selectOption struct {
 }
 
 func promptRequiredInput(argName string, prompt string, defaultValue string) (string, error) {
+	hint := fmt.Sprintf("Usage: sandbox template add <name> <source>")
+	if argName == "name" {
+		hint = "Provide the template name as the first argument"
+	} else if argName == "source" {
+		hint = "Provide the template source as the second argument (for example: images:ubuntu/24.04)"
+	}
+	return promptRequiredValue(argName, prompt, defaultValue, hint)
+}
+
+func promptRequiredValue(argName string, prompt string, defaultValue string, missingHint string) (string, error) {
 	if !isSelectionTTY() {
-		hint := fmt.Sprintf("Usage: sandbox template add <name> <source>")
-		if argName == "name" {
-			hint = "Provide the template name as the first argument"
-		} else if argName == "source" {
-			hint = "Provide the template source as the second argument (for example: images:ubuntu/24.04)"
+		hint := strings.TrimSpace(missingHint)
+		if hint == "" {
+			hint = fmt.Sprintf("Provide required argument: %s", argName)
 		}
 		return "", newCLIError(
 			fmt.Sprintf("missing required argument: %s", argName),

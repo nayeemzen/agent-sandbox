@@ -34,6 +34,7 @@ func TestRootHelpIncludesPlannedCommands(t *testing.T) {
 		"resume",
 		"stop",
 		"start",
+		"rename",
 		"delete",
 		"monitor",
 		"completion",

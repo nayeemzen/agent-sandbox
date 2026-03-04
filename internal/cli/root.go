@@ -52,6 +52,7 @@ func NewRootCmd() *cobra.Command {
 		newResumeCmd(opts),
 		newStopCmd(opts),
 		newStartCmd(opts),
+		newRenameCmd(opts),
 		newDeleteCmd(opts),
 		newMonitorCmd(opts, time.Second*15),
 		newCompletionCmd(),

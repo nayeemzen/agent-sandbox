@@ -219,6 +219,9 @@ sandbox stop mybox
 sandbox start mybox
 sandbox stop mybox --timeout 2m
 
+# Rename a sandbox (must be stopped first)
+sandbox rename mybox mybox-v2
+
 # Force stop (immediate)
 sandbox stop mybox --force
 
