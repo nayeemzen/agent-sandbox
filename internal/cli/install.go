@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -117,7 +118,7 @@ func newInstallCmd(opts *GlobalOptions) *cobra.Command {
 				{Title: "Enable and start Incus daemon/socket", Status: installPending, Run: runInstallStepEnableIncus},
 				{Title: "Initialize Incus (incus admin init --minimal)", Status: installPending, Run: runInstallStepInitIncus},
 				{Title: "Ensure user is in incus-admin group", Status: installPending, Run: runInstallStepEnsureIncusAdminGroup},
-				{Title: "Configure UFW DHCP allowance for incusbr0 (if UFW active)", Status: installPending, Run: runInstallStepConfigureUFW},
+				{Title: "Configure UFW bridge allowances for Incus (if UFW active)", Status: installPending, Run: runInstallStepConfigureUFW},
 				{Title: "Install skopeo (optional)", Status: installPending, Run: runInstallStepInstallSkopeo},
 				{Title: "Run sandbox doctor", Status: installPending, Run: runInstallStepDoctor},
 				{Title: "Create/select default template (sandbox init)", Status: installPending, Run: runInstallStepInitTemplate},
@@ -426,18 +427,75 @@ func runInstallStepConfigureUFW(ctx context.Context, rt *installRuntime) (instal
 		return installSkipped, "ufw inactive; skipped", nil
 	}
 
-	ruleCheck, err := rt.runCommand(ctx, "sudo", "sh", "-lc", "if ufw status | grep -qiE '67/udp.*incusbr0.*allow'; then echo present; else echo absent; fi")
+	type ufwRuleSpec struct {
+		checkPattern string
+		args         []string
+		label        string
+	}
+
+	rules := []ufwRuleSpec{
+		{
+			checkPattern: `67/udp.*incusbr0.*allow`,
+			args:         []string{"allow", "in", "on", "incusbr0", "to", "any", "port", "67", "proto", "udp"},
+			label:        "udp/67",
+		},
+		{
+			checkPattern: `53/udp.*incusbr0.*allow`,
+			args:         []string{"allow", "in", "on", "incusbr0", "to", "any", "port", "53", "proto", "udp"},
+			label:        "udp/53",
+		},
+		{
+			checkPattern: `53/tcp.*incusbr0.*allow`,
+			args:         []string{"allow", "in", "on", "incusbr0", "to", "any", "port", "53", "proto", "tcp"},
+			label:        "tcp/53",
+		},
+	}
+
+	changed := []string{}
+	for _, rule := range rules {
+		present, err := ufwRulePresent(ctx, rt, rule.checkPattern)
+		if err != nil {
+			return installFailed, "", err
+		}
+		if present {
+			continue
+		}
+
+		cmd := append([]string{"ufw"}, rule.args...)
+		if _, err := rt.runCommand(ctx, "sudo", cmd...); err != nil {
+			return installFailed, "", err
+		}
+		changed = append(changed, rule.label)
+	}
+
+	defaultIface, err := defaultRouteInterface(ctx, rt)
 	if err != nil {
 		return installFailed, "", err
 	}
-	if strings.Contains(strings.ToLower(ruleCheck), "present") {
-		return installComplete, "rule already present (udp/67 on incusbr0)", nil
+	defaultIface = strings.TrimSpace(defaultIface)
+	if defaultIface != "" {
+		ifacePattern := regexp.QuoteMeta(strings.ToLower(defaultIface))
+		routePattern := fmt.Sprintf(`allow fwd.*anywhere on %s.*anywhere on incusbr0|allow fwd.*anywhere on incusbr0.*anywhere on %s`, ifacePattern, ifacePattern)
+		present, err := ufwRulePresent(ctx, rt, routePattern)
+		if err != nil {
+			return installFailed, "", err
+		}
+		if !present {
+			if _, err := rt.runCommand(ctx, "sudo", "ufw", "route", "allow", "in", "on", "incusbr0", "out", "on", defaultIface); err != nil {
+				return installFailed, "", err
+			}
+			changed = append(changed, "fwd incusbr0->"+defaultIface)
+		}
 	}
 
-	if _, err := rt.runCommand(ctx, "sudo", "ufw", "--force", "allow", "in", "on", "incusbr0", "to", "any", "port", "67", "proto", "udp"); err != nil {
-		return installFailed, "", err
+	if len(changed) == 0 {
+		if defaultIface == "" {
+			return installComplete, "bridge rules already present (dhcp,dns)", nil
+		}
+		return installComplete, fmt.Sprintf("bridge rules already present (dhcp,dns,fwd->%s)", defaultIface), nil
 	}
-	return installComplete, "ensured UDP/67 allow on incusbr0", nil
+
+	return installComplete, fmt.Sprintf("ensured bridge rules: %s", strings.Join(changed, ", ")), nil
 }
 
 func runInstallStepInstallSkopeo(ctx context.Context, rt *installRuntime) (installStepStatus, string, error) {
@@ -758,6 +816,30 @@ func sandboxGlobalArgs(opts *GlobalOptions) []string {
 
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
+func ufwRulePresent(ctx context.Context, rt *installRuntime, grepPattern string) (bool, error) {
+	grepPattern = strings.TrimSpace(grepPattern)
+	if grepPattern == "" {
+		return false, fmt.Errorf("empty ufw rule pattern")
+	}
+
+	cmd := fmt.Sprintf("if ufw status | grep -qiE %s; then echo present; else echo absent; fi", shellQuote(grepPattern))
+	out, err := rt.runCommand(ctx, "sudo", "sh", "-lc", cmd)
+	if err != nil {
+		return false, err
+	}
+	return strings.Contains(strings.ToLower(out), "present"), nil
+}
+
+func defaultRouteInterface(ctx context.Context, rt *installRuntime) (string, error) {
+	// Prefer IPv4 default route for outbound internet egress.
+	out, err := rt.runCommand(ctx, "sh", "-lc", "ip -4 route show default | awk 'NR==1 {print $5}'")
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(out), nil
 }
 
 func currentUsername() (string, error) {

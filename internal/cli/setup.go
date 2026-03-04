@@ -55,7 +55,7 @@ func newSetupCmd(opts *GlobalOptions) *cobra.Command {
 			}
 
 			if plan.LocalMode {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Note: if you use UFW, ensure DHCP is allowed on your Incus bridge (for example: ufw allow in on incusbr0 to any port 67 proto udp).")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Note: if you use UFW, ensure Incus bridge rules allow DHCP (67/udp), DNS (53/tcp+udp), and forwarding from incusbr0 to your default uplink.")
 			}
 
 			if !noInit {
