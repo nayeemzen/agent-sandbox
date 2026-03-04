@@ -23,7 +23,7 @@ func promptRequiredInput(argName string, prompt string, defaultValue string) (st
 	if argName == "name" {
 		hint = "Provide the template name as the first argument"
 	} else if argName == "source" {
-		hint = "Provide the template source as the second argument (for example: images:ubuntu/24.04)"
+		hint = "Provide the template source as the second argument (for example: images:ubuntu/24.04, local:my-image, or sandbox:mybox)"
 	}
 	return promptRequiredValue(argName, prompt, defaultValue, hint)
 }

@@ -139,6 +139,9 @@ Templates are the immutable base images that sandboxes are created from. Creatin
 sandbox template add mybase images:ubuntu/24.04
 sandbox template add alpine images:alpine/3.20
 
+# Create from an existing sandbox instance
+sandbox template add mybase-tuned sandbox:mybox
+
 # List all templates
 sandbox template ls
 
@@ -152,7 +155,10 @@ sandbox template rm mybase
 sandbox template rm mybase --force
 ```
 
-The source format is `images:<alias>` for [images.linuxcontainers.org](https://images.linuxcontainers.org) or `local:<alias>` for an existing local Incus image.
+Supported source formats:
+- `images:<alias>` for [images.linuxcontainers.org](https://images.linuxcontainers.org)
+- `local:<alias>` for an existing local Incus image alias
+- `sandbox:<name>` to copy from an existing sandbox-managed instance (running or stopped)
 
 ### Creating sandboxes
 

@@ -85,16 +85,30 @@ func CreateTemplate(ctx context.Context, s incusclient.InstanceServer, name stri
 		return Template{}, err
 	}
 
+	if instanceSource.Type == "copy" {
+		inst, _, err := s.GetInstance(instanceSource.Source)
+		if err != nil {
+			if IsNotFound(err) {
+				return Template{}, fmt.Errorf("sandbox source %q not found", instanceSource.Source)
+			}
+			return Template{}, err
+		}
+		if strings.TrimSpace(inst.Config["user.sandbox.managed"]) != "true" {
+			return Template{}, fmt.Errorf("instance %q is not a sandbox-managed instance", instanceSource.Source)
+		}
+	}
+
 	createReq := api.InstancesPost{
 		Name:  seed,
 		Type:  api.InstanceTypeContainer,
 		Start: true,
 		Source: api.InstanceSource{
-			Type:        "image",
+			Type:        instanceSource.Type,
 			Alias:       instanceSource.Alias,
 			Protocol:    instanceSource.Protocol,
 			Server:      instanceSource.Server,
 			Fingerprint: instanceSource.Fingerprint,
+			Source:      instanceSource.Source,
 		},
 	}
 
@@ -224,16 +238,24 @@ func templateInUse(s incusclient.InstanceServer, name string) (bool, error) {
 }
 
 type instanceSourceRef struct {
+	Type        string
 	Alias       string
 	Protocol    string
 	Server      string
 	Fingerprint string
+	Source      string
 }
 
 func parseInstanceSource(ref string) (instanceSourceRef, error) {
 	// v1 supported forms:
 	// - images:<alias>  (simplestreams from images.linuxcontainers.org)
 	// - local:<alias>   (local Incus image alias)
+	// - sandbox:<name>  (copy from existing sandbox-managed instance)
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return instanceSourceRef{}, fmt.Errorf("invalid source %q", ref)
+	}
+
 	if strings.HasPrefix(ref, "images:") {
 		alias := strings.TrimPrefix(ref, "images:")
 		if alias == "" {
@@ -241,6 +263,7 @@ func parseInstanceSource(ref string) (instanceSourceRef, error) {
 		}
 
 		return instanceSourceRef{
+			Type:     "image",
 			Alias:    alias,
 			Protocol: "simplestreams",
 			Server:   "https://images.linuxcontainers.org",
@@ -254,11 +277,24 @@ func parseInstanceSource(ref string) (instanceSourceRef, error) {
 		}
 
 		return instanceSourceRef{
+			Type:  "image",
 			Alias: alias,
 		}, nil
 	}
 
-	return instanceSourceRef{}, fmt.Errorf("unsupported source %q (supported: images:<alias>, local:<alias>)", ref)
+	if strings.HasPrefix(ref, "sandbox:") {
+		name := strings.TrimSpace(strings.TrimPrefix(ref, "sandbox:"))
+		if name == "" {
+			return instanceSourceRef{}, fmt.Errorf("invalid source %q", ref)
+		}
+
+		return instanceSourceRef{
+			Type:   "copy",
+			Source: name,
+		}, nil
+	}
+
+	return instanceSourceRef{}, fmt.Errorf("unsupported source %q (supported: images:<alias>, local:<alias>, sandbox:<name>)", ref)
 }
 
 func randSuffix(nbytes int) string {
