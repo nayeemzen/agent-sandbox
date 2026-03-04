@@ -20,12 +20,24 @@ type Sandbox struct {
 	IPv6      []string
 }
 
+const rawLXCHaltSignalSIGTERM = "lxc.signal.halt = SIGTERM"
+
 func CreateSandbox(ctx context.Context, s incusclient.InstanceServer, name string, template string) (Sandbox, error) {
 	alias := TemplateAlias(template)
 
 	// Ensure template exists.
 	if _, _, err := s.GetImageAlias(alias); err != nil {
 		return Sandbox{}, fmt.Errorf("template %q not found", template)
+	}
+
+	instanceConfig := map[string]string{
+		"user.sandbox.managed":    "true",
+		"user.sandbox.template":   template,
+		"user.sandbox.created_at": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+
+	if source, err := templateSourceByAlias(s, alias); err == nil && shouldUseSIGTERMHaltForSource(source) {
+		instanceConfig["raw.lxc"] = appendRawLXCLine(instanceConfig["raw.lxc"], rawLXCHaltSignalSIGTERM)
 	}
 
 	req := api.InstancesPost{
@@ -37,11 +49,7 @@ func CreateSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 			Alias: alias,
 		},
 		InstancePut: api.InstancePut{
-			Config: map[string]string{
-				"user.sandbox.managed":    "true",
-				"user.sandbox.template":   template,
-				"user.sandbox.created_at": time.Now().UTC().Format(time.RFC3339Nano),
-			},
+			Config: instanceConfig,
 		},
 	}
 
@@ -72,6 +80,52 @@ func CreateSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 	sb.Template = template
 	sb.Managed = true
 	return sb, nil
+}
+
+// EnsureSandboxStopSignalCompatibility configures managed Alpine sandboxes to
+// use an init signal that PID 1 handles on shutdown (SIGTERM), making graceful
+// stop reliable.
+func EnsureSandboxStopSignalCompatibility(ctx context.Context, s incusclient.InstanceServer, name string) (bool, error) {
+	inst, etag, err := s.GetInstance(name)
+	if err != nil {
+		return false, err
+	}
+
+	source := strings.TrimSpace(inst.Config["image.user.sandbox.source"])
+	if source == "" {
+		tpl := strings.TrimSpace(inst.Config["user.sandbox.template"])
+		if tpl != "" {
+			src, err := templateSourceByAlias(s, TemplateAlias(tpl))
+			if err == nil {
+				source = strings.TrimSpace(src)
+			}
+		}
+	}
+
+	if !shouldUseSIGTERMHaltForSource(source) {
+		return false, nil
+	}
+
+	raw := inst.Config["raw.lxc"]
+	if rawLXCContainsHaltSignal(raw) {
+		return false, nil
+	}
+
+	put := inst.Writable()
+	if put.Config == nil {
+		put.Config = map[string]string{}
+	}
+	put.Config["raw.lxc"] = appendRawLXCLine(raw, rawLXCHaltSignalSIGTERM)
+
+	op, err := s.UpdateInstance(name, put, etag)
+	if err != nil {
+		return false, err
+	}
+	if err := op.WaitContext(ctx); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func GetSandbox(s incusclient.InstanceServer, name string) (Sandbox, error) {
@@ -137,8 +191,16 @@ func ResumeSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 	return updateState(ctx, s, name, api.InstanceStatePut{Action: "unfreeze", Timeout: 30})
 }
 
-func StopSandbox(ctx context.Context, s incusclient.InstanceServer, name string, force bool) error {
-	return updateState(ctx, s, name, api.InstanceStatePut{Action: "stop", Timeout: 30, Force: force})
+func StopSandbox(ctx context.Context, s incusclient.InstanceServer, name string, force bool, timeout time.Duration) error {
+	timeoutSeconds := int(timeout / time.Second)
+	if timeout%time.Second != 0 {
+		timeoutSeconds++
+	}
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 1
+	}
+
+	return updateState(ctx, s, name, api.InstanceStatePut{Action: "stop", Timeout: timeoutSeconds, Force: force})
 }
 
 func StartSandbox(ctx context.Context, s incusclient.InstanceServer, name string) error {
@@ -191,4 +253,49 @@ func extractIPs(network map[string]api.InstanceStateNetwork) (ipv4 []string, ipv
 		}
 	}
 	return ipv4, ipv6
+}
+
+func templateSourceByAlias(s incusclient.InstanceServer, alias string) (string, error) {
+	aliasEntry, _, err := s.GetImageAlias(alias)
+	if err != nil {
+		return "", err
+	}
+
+	img, _, err := s.GetImage(aliasEntry.Target)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(img.Properties["user.sandbox.source"]), nil
+}
+
+func shouldUseSIGTERMHaltForSource(source string) bool {
+	src := strings.ToLower(strings.TrimSpace(source))
+	// Alpine/OpenRC images ignore Incus's default SIGPWR halt signal.
+	return strings.HasPrefix(src, "images:alpine/") || strings.HasPrefix(src, "local:alpine/")
+}
+
+func rawLXCContainsHaltSignal(raw string) bool {
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "lxc.signal.halt") {
+			return true
+		}
+	}
+	return false
+}
+
+func appendRawLXCLine(raw string, line string) string {
+	raw = strings.TrimSpace(raw)
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return raw
+	}
+	if raw == "" {
+		return line
+	}
+	return raw + "\n" + line
 }

@@ -33,7 +33,7 @@ func newTemplateAddCmd(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "add <name> <source>",
 		Short:         "Create a template from a source (slow path)",
-		Args:          cobra.ExactArgs(2),
+		Args:          cobra.MaximumNArgs(2),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -42,8 +42,38 @@ func newTemplateAddCmd(opts *GlobalOptions) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			name := args[0]
-			source := args[1]
+			var name string
+			var source string
+			var err error
+
+			switch len(args) {
+			case 2:
+				name = strings.TrimSpace(args[0])
+				source = strings.TrimSpace(args[1])
+			case 1:
+				name = strings.TrimSpace(args[0])
+				if name == "" {
+					name, err = promptRequiredInput("name", "Template name", "")
+					if err != nil {
+						return err
+					}
+				}
+				source, err = promptRequiredInput("source", "Template source", "images:ubuntu/24.04")
+				if err != nil {
+					return err
+				}
+			case 0:
+				name, err = promptRequiredInput("name", "Template name", "")
+				if err != nil {
+					return err
+				}
+				source, err = promptRequiredInput("source", "Template source", "images:ubuntu/24.04")
+				if err != nil {
+					return err
+				}
+			default:
+				return newCLIError("too many arguments (expected at most 2)", "Usage: sandbox template add <name> <source>")
+			}
 
 			s, err := connectIncus(ctx, opts)
 			if err != nil {

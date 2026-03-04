@@ -217,6 +217,7 @@ sandbox resume mybox
 # Graceful shutdown / start
 sandbox stop mybox
 sandbox start mybox
+sandbox stop mybox --timeout 2m
 
 # Force stop (immediate)
 sandbox stop mybox --force

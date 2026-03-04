@@ -18,6 +18,50 @@ type selectOption struct {
 	Value string
 }
 
+func promptRequiredInput(argName string, prompt string, defaultValue string) (string, error) {
+	if !isSelectionTTY() {
+		hint := fmt.Sprintf("Usage: sandbox template add <name> <source>")
+		if argName == "name" {
+			hint = "Provide the template name as the first argument"
+		} else if argName == "source" {
+			hint = "Provide the template source as the second argument (for example: images:ubuntu/24.04)"
+		}
+		return "", newCLIError(
+			fmt.Sprintf("missing required argument: %s", argName),
+			hint,
+		)
+	}
+
+	validate := func(in string) error {
+		if strings.TrimSpace(in) == "" {
+			return fmt.Errorf("%s is required", argName)
+		}
+		return nil
+	}
+
+	p := promptui.Prompt{
+		Label:    prompt,
+		Default:  defaultValue,
+		Validate: validate,
+	}
+
+	value, err := p.Run()
+	if err != nil {
+		return "", err
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = strings.TrimSpace(defaultValue)
+	}
+	if value == "" {
+		return "", newCLIError(
+			fmt.Sprintf("missing required argument: %s", argName),
+			"Please provide a non-empty value",
+		)
+	}
+	return value, nil
+}
+
 func pickRequiredArg(argName string, prompt string, options []selectOption) (string, error) {
 	if len(options) == 0 {
 		return "", newCLIError(

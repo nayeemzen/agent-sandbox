@@ -141,6 +141,7 @@ func newResumeCmd(opts *GlobalOptions) *cobra.Command {
 
 func newStopCmd(opts *GlobalOptions) *cobra.Command {
 	var force bool
+	var timeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:           "stop <name>",
@@ -181,7 +182,34 @@ func newStopCmd(opts *GlobalOptions) *cobra.Command {
 				return nil
 			}
 
-			if err := incus.StopSandbox(ctx, s, name, force); err != nil {
+			// Best-effort compatibility fix for existing Alpine sandboxes.
+			_, _ = incus.EnsureSandboxStopSignalCompatibility(ctx, s, name)
+
+			if timeout <= 0 {
+				return newCLIError("stop timeout must be > 0", "Example: sandbox stop <name> --timeout 45s")
+			}
+
+			if err := incus.StopSandbox(ctx, s, name, force, timeout); err != nil {
+				// In some cases graceful shutdown times out but the instance stops shortly after.
+				// Re-check state before returning an error.
+				if sbNow, getErr := incus.GetSandbox(s, name); getErr == nil && strings.EqualFold(sbNow.Status, "stopped") {
+					if err := upsertSandboxState(opts, sbNow); err != nil {
+						return err
+					}
+					if opts.JSON {
+						return writeJSON(cmd.OutOrStdout(), map[string]any{"name": name, "status": "stopped"})
+					}
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s stopped\n", name)
+					return nil
+				}
+
+				if !force && isGracefulStopTimeout(err) {
+					return newCLIError(
+						fmt.Sprintf("graceful stop timed out for %q", name),
+						fmt.Sprintf("Retry with a longer timeout (sandbox stop %s --timeout 2m) or force stop (sandbox stop %s --force)", name, name),
+					)
+				}
+
 				return err
 			}
 
@@ -202,6 +230,7 @@ func newStopCmd(opts *GlobalOptions) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&force, "force", false, "Force stop (may drop connections)")
+	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "Graceful stop timeout before failing")
 	return cmd
 }
 
@@ -381,4 +410,9 @@ func chooseSandboxArg(s incusclient.InstanceServer, args []string, argName strin
 	default:
 		return "", newCLIError("too many arguments (expected at most 1)", "Usage: sandbox <command> [name]")
 	}
+}
+
+func isGracefulStopTimeout(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "context deadline exceeded")
 }
