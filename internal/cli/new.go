@@ -89,7 +89,7 @@ func newNewCmd(opts *GlobalOptions) *cobra.Command {
 			})
 			dur := time.Since(start)
 			if err != nil {
-				return err
+				return decorateNewSandboxCreateError(err, name)
 			}
 
 			st, stPath, err := loadState(opts)
@@ -155,4 +155,48 @@ func nonZeroTime(v time.Time, fallback time.Time) time.Time {
 		return v
 	}
 	return fallback
+}
+
+func decorateNewSandboxCreateError(err error, name string) error {
+	if err == nil {
+		return nil
+	}
+
+	var existsErr *incus.SandboxExistsError
+	if !errors.As(err, &existsErr) {
+		return err
+	}
+
+	displayName := strings.TrimSpace(existsErr.Name)
+	if displayName == "" {
+		displayName = strings.TrimSpace(name)
+	}
+	if displayName == "" {
+		displayName = "sandbox"
+	}
+
+	if !existsErr.Managed {
+		return newCLIError(
+			fmt.Sprintf("instance %q already exists and is not sandbox-managed", displayName),
+			fmt.Sprintf("Choose another sandbox name, or manage/remove that instance with Incus (`incus list`, `incus delete %s`).", displayName),
+		)
+	}
+
+	status := strings.TrimSpace(existsErr.Status)
+	if status == "" {
+		status = "Unknown"
+	}
+
+	primary := fmt.Sprintf("sandbox start %s", displayName)
+	switch strings.ToLower(status) {
+	case "running":
+		primary = fmt.Sprintf("sandbox exec %s", displayName)
+	case "frozen":
+		primary = fmt.Sprintf("sandbox resume %s", displayName)
+	}
+
+	return newCLIError(
+		fmt.Sprintf("sandbox %q already exists (state=%s)", displayName, status),
+		fmt.Sprintf("Reuse it with `%s`, or replace it with `sandbox delete %s --yes` then `sandbox new %s`.", primary, displayName, displayName),
+	)
 }

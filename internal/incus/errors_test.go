@@ -21,3 +21,20 @@ func TestIsNotFound(t *testing.T) {
 		t.Fatalf("expected false for unrelated errors")
 	}
 }
+
+func TestIsAlreadyExists(t *testing.T) {
+	t.Parallel()
+
+	if IsAlreadyExists(nil) {
+		t.Fatalf("expected false for nil")
+	}
+	if !IsAlreadyExists(errors.New("already exists")) {
+		t.Fatalf("expected true for already exists")
+	}
+	if !IsAlreadyExists(errors.New(`This "instances" entry already exists`)) {
+		t.Fatalf("expected true for Incus already-exists error")
+	}
+	if IsAlreadyExists(errors.New("not found")) {
+		t.Fatalf("expected false for unrelated errors")
+	}
+}

@@ -30,6 +30,13 @@ func CreateSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 		return Sandbox{}, fmt.Errorf("template %q not found", template)
 	}
 
+	// Preflight name collision check for clearer UX.
+	if inst, _, err := s.GetInstance(name); err == nil {
+		return Sandbox{}, sandboxExistsErrorFromInstance(inst)
+	} else if !IsNotFound(err) {
+		return Sandbox{}, err
+	}
+
 	instanceConfig := map[string]string{
 		"user.sandbox.managed":    "true",
 		"user.sandbox.template":   template,
@@ -55,6 +62,12 @@ func CreateSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 
 	op, err := s.CreateInstance(req)
 	if err != nil {
+		// If a collision slipped in between preflight and create, map it to a typed error.
+		if IsAlreadyExists(err) {
+			if inst, _, getErr := s.GetInstance(name); getErr == nil {
+				return Sandbox{}, sandboxExistsErrorFromInstance(inst)
+			}
+		}
 		return Sandbox{}, err
 	}
 	if err := op.WaitContext(ctx); err != nil {
@@ -80,6 +93,18 @@ func CreateSandbox(ctx context.Context, s incusclient.InstanceServer, name strin
 	sb.Template = template
 	sb.Managed = true
 	return sb, nil
+}
+
+func sandboxExistsErrorFromInstance(inst *api.Instance) error {
+	if inst == nil {
+		return &SandboxExistsError{}
+	}
+
+	return &SandboxExistsError{
+		Name:    strings.TrimSpace(inst.Name),
+		Managed: strings.TrimSpace(inst.Config["user.sandbox.managed"]) == "true",
+		Status:  strings.TrimSpace(inst.Status),
+	}
 }
 
 // EnsureSandboxStopSignalCompatibility configures managed Alpine sandboxes to
